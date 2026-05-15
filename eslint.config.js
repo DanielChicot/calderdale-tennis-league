@@ -9,7 +9,7 @@ export default tseslint.config(
       '.remember/**',
       '.superpowers/**',
       '.beads/**',
-      'fixtures/**',
+      '**/fixtures/**',
     ],
   },
   ...tseslint.configs.recommendedTypeChecked,

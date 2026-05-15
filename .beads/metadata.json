@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "calderdale_tennis_league",
+  "project_id": "35785ab1-dbf8-42df-a52c-88ad90daea59"
+}

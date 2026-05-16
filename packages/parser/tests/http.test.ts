@@ -9,7 +9,7 @@ describe('fetchHtml', () => {
   it('returns body text on 200', async () => {
     const fakeFetch = vi.fn().mockResolvedValue({
       status: 200,
-      text: async () => '<html>ok</html>',
+      text: () => Promise.resolve('<html>ok</html>'),
       headers: new Headers(),
     });
     const html = await fetchHtml('https://example.test/page', { fetch: fakeFetch });
@@ -19,7 +19,7 @@ describe('fetchHtml', () => {
   it('throws with status and url on non-200', async () => {
     const fakeFetch = vi.fn().mockResolvedValue({
       status: 503,
-      text: async () => 'oops',
+      text: () => Promise.resolve('oops'),
       headers: new Headers(),
     });
     await expect(fetchHtml('https://example.test/page', { fetch: fakeFetch })).rejects.toThrow(
@@ -30,7 +30,7 @@ describe('fetchHtml', () => {
   it('sends a polite User-Agent', async () => {
     const fakeFetch = vi.fn().mockResolvedValue({
       status: 200,
-      text: async () => '<html />',
+      text: () => Promise.resolve('<html />'),
       headers: new Headers(),
     });
     await fetchHtml('https://example.test/page', { fetch: fakeFetch });

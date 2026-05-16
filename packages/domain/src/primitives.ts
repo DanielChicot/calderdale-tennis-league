@@ -6,5 +6,5 @@ export type Slug = z.infer<typeof Slug>;
 export const BtmNumber = z.string().regex(/^\d{4,8}$/);
 export type BtmNumber = z.infer<typeof BtmNumber>;
 
-export const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const IsoDate = z.string().date();
 export type IsoDate = z.infer<typeof IsoDate>;

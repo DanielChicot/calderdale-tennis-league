@@ -3,10 +3,13 @@ import { fetch } from 'undici';
 const BASE = 'https://www.calderdale.tennis-league.org/';
 const UA = 'CalderdaleLeagueMirror-spike/0.1 (contact: dan.chicot@gmail.com)';
 
-const probe = async (label: string, url: string, init: RequestInit = {}) => {
+const probe = async (
+  label: string,
+  url: string,
+  options: { headers?: Record<string, string> } = {},
+) => {
   const res = await fetch(url, {
-    ...init,
-    headers: { 'User-Agent': UA, ...(init.headers ?? {}) },
+    headers: { 'User-Agent': UA, ...(options.headers ?? {}) },
     redirect: 'manual',
   });
   const body = await res.text();

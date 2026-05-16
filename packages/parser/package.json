@@ -1,0 +1,15 @@
+{
+  "name": "@ctl/parser",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "undici": "^6.20.0"
+  }
+}

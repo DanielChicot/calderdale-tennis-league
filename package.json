@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "parse": "pnpm --filter parse-cli exec tsx src/index.ts"
+    "parse": "pnpm --filter parse-cli exec tsx src/index.ts",
+    "capture": "tsx fixtures/capture.ts"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

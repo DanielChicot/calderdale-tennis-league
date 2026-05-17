@@ -16,7 +16,7 @@ describe('parseClubsDirectory', () => {
     const html = await loadFixture('clubs-directory.html');
     const clubs = parseClubsDirectory(html);
 
-    expect(clubs.length).toBeGreaterThan(10);
+    expect(clubs.length).toBe(18);
     for (const c of clubs) {
       expect(() => Club.parse(c)).not.toThrow();
     }
@@ -30,11 +30,26 @@ describe('parseClubsDirectory', () => {
     expect(cv?.slug).toBe('cragg-vale-tennis-club');
   });
 
-  it('assigns deterministic positive ids', async () => {
+  it('assigns deterministic positive ids across repeated calls', async () => {
     const html = await loadFixture('clubs-directory.html');
-    const clubs = parseClubsDirectory(html);
-    const ids = clubs.map((c) => c.id);
+    const first = parseClubsDirectory(html);
+    const second = parseClubsDirectory(html);
+
+    expect(first.map((c) => c.id)).toEqual(second.map((c) => c.id));
+    expect(first.map((c) => c.slug)).toEqual(second.map((c) => c.slug));
+
+    const ids = first.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.every((id) => Number.isInteger(id) && id > 0)).toBe(true);
+  });
+
+  it('captures clubs whose names contain an ampersand', async () => {
+    const html = await loadFixture('clubs-directory.html');
+    const clubs = parseClubsDirectory(html);
+    const names = clubs.map((c) => c.name);
+    expect(names).toContain('Elland Cricket, Athletic & Bowling Club');
+    expect(names).toContain('Huddersfield Lawn Tennis & Squash Club');
+    expect(names).toContain('Oakfield Tennis & Bowling Club Ltd');
+    expect(names).toContain('Sowerby Tennis & Bowling Club');
   });
 });

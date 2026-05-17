@@ -36,6 +36,12 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.19)
 
+  apps/parse-cli:
+    dependencies:
+      '@ctl/parser':
+        specifier: workspace:*
+        version: link:../../packages/parser
+
   packages/domain:
     dependencies:
       zod:
@@ -1414,7 +1420,7 @@ packages:
     engines: {node: '>=10'}
 
   zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==, tarball: https://artifacts.dla.com:443/artifactory/api/npm/npm/zod/-/zod-3.25.76.tgz}
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
 

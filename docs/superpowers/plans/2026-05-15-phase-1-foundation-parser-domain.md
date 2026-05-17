@@ -10,6 +10,34 @@
 
 ---
 
+## Addendum (2026-05-17) — upstream architecture discovery
+
+After Task 2 (CSRF spike) and partway through Task 5 (fixture capture), an
+investigative pass discovered that the upstream site is a hybrid:
+
+- Most public-view data is **server-rendered inline** in the `index.php` shell
+  (the same ~250 KB page just shows different active tabs based on `tabIndex`).
+- Only the *Fixtures & Results* tab (tab 1) loads its content via XHR from
+  `ludus-online.com/.../displayResults.php`. Tabs 0 (League Table), 2 (Contacts list),
+  3 (Locations list), and 4 (Player Rankings) all have their primary data inline
+  in the shell — sub-detail panels (contact details, location maps, match cards)
+  load on click from per-detail PHP fragments.
+- See `spike/fragment-urls.md` for the full discovery map (tab → endpoint,
+  parameter conventions, CSRF-token notes, archive season navigation, etc.).
+
+**Impact on Phase 1:** None. All three Phase 1 parsers (clubs directory,
+league table, player rankings) operate on inline-rendered shell HTML. They
+each look up a known `<div id="...">` block and parse rows within it:
+
+- `parseClubsDirectory` → clubs/teams list block on the directory shell
+- `parseLeagueTable` → `<div id="leagueTable">` on the season shell with `tabIndex=0`
+- `parsePlayerRankings` → `<div id="playerRanking">` on the season shell with `tabIndex=4`
+
+Phase 2 will introduce parsers for the XHR fragments
+(`displayResults.php`, `result_card_*.php`, `displayContacts.php`,
+`displayLocations.php`) and the scraper that walks the full site by following
+discovered URLs.
+
 ## File structure at end of phase
 
 ```

@@ -46,4 +46,11 @@ describe('parsePlayerRankings', () => {
     const b = parsePlayerRankings(html);
     expect(a).toEqual(b);
   });
+
+  it('preserves decimal rubbersWon (half-points exist)', async () => {
+    const html = await loadFixture('player-rankings-mixed-div-1.html');
+    const rows = parsePlayerRankings(html);
+    const someDecimal = rows.find((r) => !Number.isInteger(r.rubbersWon));
+    expect(someDecimal).toBeDefined();
+  });
 });

@@ -26,8 +26,8 @@ const playerAndClub = (text: string): { playerName: string; clubName: string | n
 };
 
 const movementFromImgSrc = (src: string, cellText: string): RankingMovement => {
-  if (src.includes('up_arrow')) return 'up';
-  if (src.includes('down_arrow')) return 'down';
+  if (src.includes('red_on_green_up_arrow')) return 'up';
+  if (src.includes('red_on_green_down_arrow')) return 'down';
   if (/new/i.test(cellText)) return 'new';
   return 'same';
 };
@@ -38,16 +38,17 @@ export const parsePlayerRankings = (html: string): PlayerRankingRow[] => {
 
   $('#playerRanking table.playerRankings_table tbody tr').each((_, el) => {
     const $cells = $(el).find('td');
-    if ($cells.length < 10) return;
+    if ($cells.length < 11) return;
 
     const { playerName, clubName } = playerAndClub($cells.eq(1).text().trim());
     if (!playerName) return;
 
+    const rank = parseIntStrict($cells.eq(0).text().trim());
     const movementCell = $cells.eq(10);
     const imgSrc = movementCell.find('img').attr('src') ?? '';
 
     rows.push({
-      rank: rows.length + 1,
+      rank,
       playerName,
       clubName,
       primaryDivision: $cells.eq(2).text().trim() || null,

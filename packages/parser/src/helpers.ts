@@ -18,3 +18,18 @@ export const parseScore = (input: string): { home: number; away: number } => {
   }
   return { home: Number(match[1]), away: Number(match[2]) };
 };
+
+export const parseDecimalStrict = (input: string): number => {
+  if (!/^-?\d+(?:\.\d+)?$/.test(input)) {
+    throw new Error(`parseDecimalStrict: not a decimal: ${JSON.stringify(input)}`);
+  }
+  return Number(input);
+};
+
+export const parseFraction = (input: string): { num: number; denom: number } => {
+  const m = /^(\d+)\s*\/\s*(\d+)$/.exec(input.trim());
+  if (!m) {
+    throw new Error(`parseFraction: not a fraction: ${JSON.stringify(input)}`);
+  }
+  return { num: Number(m[1]), denom: Number(m[2]) };
+};

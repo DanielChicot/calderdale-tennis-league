@@ -1,27 +1,27 @@
 import { load } from 'cheerio';
-import type { Club } from '@ctl/domain';
 import { slugify } from './helpers.js';
+
+export type ClubsDirectoryRow = {
+  observedName: string;
+  slug: string;
+};
 
 const NAME_PATTERN = /Mode=html[^"]*?&name=([^"]+?)&user_privacy=/g;
 
-export const parseClubsDirectory = (html: string): Club[] => {
+export const parseClubsDirectory = (html: string): ClubsDirectoryRow[] => {
   const $ = load(html);
-  const seen = new Map<string, Club>();
+  const seen = new Map<string, ClubsDirectoryRow>();
 
   $('script').each((_, el) => {
     const content = $(el).html() ?? '';
     let match: RegExpExecArray | null;
     NAME_PATTERN.lastIndex = 0;
     while ((match = NAME_PATTERN.exec(content)) !== null) {
-      const name = decodeURIComponent(match[1] ?? '').trim();
-      if (!name) continue;
-      const slug = slugify(name);
+      const observedName = decodeURIComponent(match[1] ?? '').trim();
+      if (!observedName) continue;
+      const slug = slugify(observedName);
       if (seen.has(slug)) continue;
-      seen.set(slug, {
-        id: seen.size + 1,
-        slug,
-        name,
-      });
+      seen.set(slug, { observedName, slug });
     }
   });
 

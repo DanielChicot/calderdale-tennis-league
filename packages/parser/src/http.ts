@@ -14,8 +14,10 @@ export const fetchHtml = async (url: string, options: FetchHtmlOptions = {}): Pr
     headers: { 'User-Agent': USER_AGENT, ...(options.headers ?? {}) },
     redirect: 'follow',
   });
+  const body = await res.text();
   if (res.status !== 200) {
-    throw new Error(`fetchHtml: ${res.status} for ${url}`);
+    const snippet = body.slice(0, 200).replace(/\s+/g, ' ').trim();
+    throw new Error(`fetchHtml: ${res.status} for ${url} — ${snippet}`);
   }
-  return res.text();
+  return body;
 };

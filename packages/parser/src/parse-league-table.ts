@@ -1,4 +1,4 @@
-import * as cheerio from 'cheerio';
+import { load } from 'cheerio';
 import { parseDecimalStrict, parseFraction } from './helpers.js';
 
 export type LeagueTableRow = {
@@ -11,7 +11,7 @@ export type LeagueTableRow = {
 };
 
 export const parseLeagueTable = (html: string): LeagueTableRow[] => {
-  const $ = cheerio.load(html);
+  const $ = load(html);
   const rows: LeagueTableRow[] = [];
 
   $('#leagueTable table.leagueTable_table tbody tr').each((_, el) => {

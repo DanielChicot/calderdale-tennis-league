@@ -1,11 +1,11 @@
-import * as cheerio from 'cheerio';
+import { load } from 'cheerio';
 import type { Club } from '@ctl/domain';
 import { slugify } from './helpers.js';
 
 const NAME_PATTERN = /Mode=html[^"]*?&name=([^"]+?)&user_privacy=/g;
 
 export const parseClubsDirectory = (html: string): Club[] => {
-  const $ = cheerio.load(html);
+  const $ = load(html);
   const seen = new Map<string, Club>();
 
   $('script').each((_, el) => {

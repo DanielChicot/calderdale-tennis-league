@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@ctl/domain": "workspace:*",
-    "cheerio": "^1.0.0",
-    "undici": "^6.20.0"
+    "cheerio": "^1.0.0"
   }
 }

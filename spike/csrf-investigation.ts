@@ -1,5 +1,3 @@
-import { fetch } from 'undici';
-
 const BASE = 'https://www.calderdale.tennis-league.org/';
 const UA = 'CalderdaleLeagueMirror-spike/0.1 (contact: dan.chicot@gmail.com)';
 

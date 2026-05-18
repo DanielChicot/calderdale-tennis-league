@@ -1,4 +1,4 @@
-import * as cheerio from 'cheerio';
+import { load } from 'cheerio';
 import { parseIntStrict, parseDecimalStrict } from './helpers.js';
 import type { RankingMovement } from '@ctl/domain';
 
@@ -33,7 +33,7 @@ const movementFromImgSrc = (src: string, cellText: string): RankingMovement => {
 };
 
 export const parsePlayerRankings = (html: string): PlayerRankingRow[] => {
-  const $ = cheerio.load(html);
+  const $ = load(html);
   const rows: PlayerRankingRow[] = [];
 
   $('#playerRanking table.playerRankings_table tbody tr').each((_, el) => {

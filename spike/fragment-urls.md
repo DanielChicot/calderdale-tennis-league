@@ -175,9 +175,11 @@ Seasons present: Summer 2021, 2022, 2023, 2024, 2025 (plus current Summer 2026).
 - `divisionGroupID=1` = the "mixed" group (Mixed Div 1+2 share a group for rankings)
 - `playerRankingsEntireLeague=division` shows one division; `division_group` shows both
   divisions in the group
-- `refreshProtectionCode` is a session/CSRF token embedded in each shell response; it is
-  **not** needed for the `displayResults.php` fragment endpoint, but **is** required for
-  `displayContacts.php`, `displayLocations.php`, `result_card_37.php`, etc.
+- `refreshProtectionCode` is a client-side cache-buster, not a CSRF guard: the upstream
+  treats `refreshProtectionCode=0` as valid for every fragment endpoint tested. Verified
+  by Phase 1 for the shell pages and `displayResults.php`, and by Phase 2 Task 1
+  (commit `ac3d332`, `spike/findings-phase-2.md`) for `displayContacts.php`,
+  `displayLocations.php`, and `result_card_*.php`.
 - `modeID` param in result card URLs is PHP-serialized and base64-encoded, not a plain int
 - `ListTeams.php` uses bare `ludus-online.com` (without `www`) — this resolves correctly
 

@@ -49,7 +49,9 @@ export const parseSeasonNav = (html: string): SeasonNavResult => {
   // shows the year ("2025"), but the full season name ("Summer 2025") is encoded
   // in the href. We reconstruct it from there.
   $('a[href*="archive_stage="]').each((_, el) => {
-    const href = $(el).attr('href') ?? '';
+    const rawHref = $(el).attr('href') ?? '';
+    // Defensive: upstream sometimes percent-encodes query params (e.g. %3A for colon).
+    const href = decodeURIComponent(rawHref);
     const match = /archive_stage=([^:&]+):(\d{4})/.exec(href);
     if (!match) return;
 

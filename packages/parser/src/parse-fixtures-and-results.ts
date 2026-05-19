@@ -51,13 +51,22 @@ const toIsoDate = (raw: string): string => {
 };
 
 const classifyStatus = (statusText: string, hasScore: boolean): FixtureStatus => {
-  const t = statusText.toLowerCase();
-  if (/match\s*conceded/.test(t)) return 'match-conceded';
-  if (/rubbers?\s*conceded/.test(t)) return 'rubbers-conceded';
-  if (/rearr.*postponed/.test(t)) return 'rearranged-postponed';
-  if (/rearr.*unfinished/.test(t)) return 'rearranged-unfinished';
-  if (/postponed/.test(t)) return 'postponed';
-  if (/unfinished/.test(t)) return 'unfinished';
+  const t = statusText.trim();
+  // Upstream uses abbreviations in the status notes cell:
+  //   "MC"    = Match Conceded
+  //   "<n>RC" = Rubbers Conceded (n = number of conceded rubbers)
+  // (Other statuses like postponed/unfinished/rearranged-* are speculative — we keep
+  //  the long-form patterns as fallbacks until a real fixture confirms their format.)
+  if (/^mc$/i.test(t)) return 'match-conceded';
+  if (/^\d+rc$/i.test(t)) return 'rubbers-conceded';
+
+  const lower = t.toLowerCase();
+  if (/match\s*conceded/.test(lower)) return 'match-conceded';
+  if (/rubbers?\s*conceded/.test(lower)) return 'rubbers-conceded';
+  if (/rearr.*postponed/.test(lower)) return 'rearranged-postponed';
+  if (/rearr.*unfinished/.test(lower)) return 'rearranged-unfinished';
+  if (/postponed/.test(lower)) return 'postponed';
+  if (/unfinished/.test(lower)) return 'unfinished';
   if (hasScore) return 'completed';
   return 'scheduled';
 };
@@ -79,7 +88,7 @@ export const parseFixturesAndResults = (html: string): FixtureRow[] => {
   $('table.resultsWizardWebObject_table tbody tr').each((_, el) => {
     const tds = $(el).find('td');
     // Skip empty sentinel rows (e.g. id="firstOutstanding")
-    if (tds.length < 12) return;
+    if (tds.length < 14) return;
 
     const cell = (i: number) => tds.eq(i).text().trim();
 

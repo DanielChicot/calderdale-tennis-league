@@ -72,4 +72,18 @@ describe('parseFixturesAndResults', () => {
     );
     expect(hasHalfScore).toBe(true);
   });
+
+  it('classifies "MC" rows as match-conceded', async () => {
+    const html = await loadFixture('fixtures-and-results-mens-div-1.html');
+    const rows = parseFixturesAndResults(html);
+    const conceded = rows.filter((r) => r.status === 'match-conceded');
+    expect(conceded.length).toBeGreaterThan(0);
+  });
+
+  it('classifies "<n>RC" rows as rubbers-conceded', async () => {
+    const html = await loadFixture('fixtures-and-results-mens-div-1.html');
+    const rows = parseFixturesAndResults(html);
+    const conceded = rows.filter((r) => r.status === 'rubbers-conceded');
+    expect(conceded.length).toBeGreaterThan(0);
+  });
 });

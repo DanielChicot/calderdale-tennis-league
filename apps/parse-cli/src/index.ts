@@ -22,6 +22,10 @@ const dispatch = (pageType: PageType, html: string): unknown => {
     case 'match-card': return parseMatchCard(html);
     case 'club-contacts': return parseClubContacts(html);
     case 'club-location': return parseClubLocation(html);
+    default: {
+      const _exhaustive: never = pageType;
+      throw new Error(`dispatch: unhandled page type: ${String(_exhaustive)}`);
+    }
   }
 };
 

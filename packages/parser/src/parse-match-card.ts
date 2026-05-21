@@ -90,6 +90,16 @@ export const parseMatchCard = (html: string): MatchCardResult => {
     return pairNameCache.get(key)!;
   };
 
+  // The home team name is read once from the left column header td that has
+  // class matchCardBordered and contains "Home Team".
+  const homeTeamName = $('td.matchCardBordered')
+    .filter((_, el) => $(el).text().includes('Home Team'))
+    .find('br')
+    .parent()
+    .text()
+    .replace('Home Team', '')
+    .trim();
+
   const rubbers: MatchCardRubberRow[] = rubberCodes.map((code, i) => {
     const parts = code.split('v');
     const homePairIdx = parseInt(parts[0]!, 10);
@@ -120,9 +130,6 @@ export const parseMatchCard = (html: string): MatchCardResult => {
       const loserGames = parseIntStrict(loserInput.attr('value') ?? '0');
 
       // Determine which team won by finding the winner input.
-      // The winner input is the only plain <input type="text"> inside the
-      // second inner table of the rubber cell that has a disabled attribute
-      // and no ID starting with "resultsCard_rubber".
       // It appears after the abandoned checkbox whose id is
       // `resultsCard_rubber_{code}_abandoned`.
       const winnerInput = $(`#resultsCard_rubber_${code}_abandoned`)
@@ -132,38 +139,10 @@ export const parseMatchCard = (html: string): MatchCardResult => {
 
       const winnerTeamName = winnerInput.attr('value')?.trim() ?? '';
 
-      // Derive home/away score:
-      // The home team is identified by the first disabled text input after
-      // "beat"/"lost" status span in the Match Results cell.
-      // More reliably: we use the home team name from the fixture header.
-      // The fixture always lists the home team second after "beat"/"lost to".
-      // Simplest heuristic: home team name comes from the home pair inputs
-      // — but that gives player names, not team name.
-      //
-      // Instead, we read the two team inputs at the top of the Match Results
-      // cell: the second one (after "beat") is the home team.
-      const homeTeamInput = $('input[type="text"][disabled]').filter((_, el) => {
-        const parent = $(el).closest('td');
-        return parent.find('#resultsCard_matchResultStatus').length > 0;
-      });
-
-      // homeTeamInput is a set; index 0 = winner (away or home), index 1 = loser.
-      // Actually: the Match Results block shows winner then loser.
-      // We need the home team name specifically.
-      // The home team is always the team listed on the left column header.
-      // That <td> has class matchCardBordered and contains "Home Team".
-      const homeTeamName = $('td.matchCardBordered')
-        .filter((_, el) => $(el).text().includes('Home Team'))
-        .find('br')
-        .parent()
-        .text()
-        .replace('Home Team', '')
-        .trim();
-
       let homeGames: number;
       let awayGames: number;
 
-      if (winnerTeamName === homeTeamName || winnerTeamName.startsWith(homeTeamName)) {
+      if (winnerTeamName === homeTeamName) {
         homeGames = winnerGames;
         awayGames = loserGames;
       } else {

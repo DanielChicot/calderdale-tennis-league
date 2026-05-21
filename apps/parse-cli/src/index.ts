@@ -4,17 +4,24 @@ import {
   parseClubsDirectory,
   parseLeagueTable,
   parsePlayerRankings,
+  parseSeasonNav,
+  parseFixturesAndResults,
+  parseMatchCard,
+  parseClubContacts,
+  parseClubLocation,
   type PageType,
 } from '@ctl/parser';
 
 const dispatch = (pageType: PageType, html: string): unknown => {
   switch (pageType) {
-    case 'clubs-directory':
-      return parseClubsDirectory(html);
-    case 'league-table':
-      return parseLeagueTable(html);
-    case 'player-rankings':
-      return parsePlayerRankings(html);
+    case 'clubs-directory': return parseClubsDirectory(html);
+    case 'league-table': return parseLeagueTable(html);
+    case 'player-rankings': return parsePlayerRankings(html);
+    case 'season-nav': return parseSeasonNav(html);
+    case 'fixtures-and-results': return parseFixturesAndResults(html);
+    case 'match-card': return parseMatchCard(html);
+    case 'club-contacts': return parseClubContacts(html);
+    case 'club-location': return parseClubLocation(html);
   }
 };
 
@@ -26,8 +33,7 @@ const main = async () => {
   }
   const pageType = detectPageType(url);
   const html = await fetchHtml(url);
-  const result = dispatch(pageType, html);
-  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  process.stdout.write(JSON.stringify(dispatch(pageType, html), null, 2) + '\n');
 };
 
 main().catch((err) => {

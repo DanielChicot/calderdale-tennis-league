@@ -41,17 +41,15 @@ export const parseClubLocation = (html: string): ClubLocationRow => {
     const match = POSTCODE_RE.exec(text);
     if (match?.[1] !== undefined) {
       addressText = text;
-      postcode = match[1].replace(/\s+/, ' ').toUpperCase();
+      postcode = match[1].replace(/\s+/g, ' ').toUpperCase();
       break;
     }
   }
 
-  // Normalise address: collapse whitespace and trailing noise
+  // Normalise address: collapse whitespace.
   let address: string | undefined;
   if (addressText !== undefined) {
     address = addressText.replace(/\s+/g, ' ').trim();
-    // Strip any trailing bold-tag artefact (the fixture has a stray </b> after postcode)
-    address = address.replace(/\s*<\/b>\s*$/, '').trim();
   }
 
   // Extract lat/lng if present in a map iframe src or script text

@@ -1,0 +1,57 @@
+export type WalkStep =
+  | { kind: 'season-nav'; url: string }
+  | { kind: 'clubs-directory'; url: string }
+  | { kind: 'locations-directory'; url: string }
+  | { kind: 'club-contacts'; url: string; teamId: number }
+  | { kind: 'club-location'; url: string; clubId: number }
+  | { kind: 'league-table'; url: string; divisionSlug: string }
+  | { kind: 'fixtures-and-results'; url: string; divisionId: number; modeId: number }
+  | { kind: 'player-rankings'; url: string; divisionSlug: string }
+  | { kind: 'match-card'; url: string; fixtureId: number };
+
+export type DivisionDescriptor = {
+  divisionId: number;
+  divisionSlug: string;
+  upstreamModeId: number;     // the modeID query param value
+};
+
+const BASE_SHELL = 'https://www.calderdale.tennis-league.org/';
+const BASE_FRAGMENT = 'https://www.ludus-online.com/';
+
+export const buildInitialSteps = (): WalkStep[] => [
+  { kind: 'season-nav', url: BASE_SHELL },
+  {
+    kind: 'clubs-directory',
+    url: `${BASE_SHELL}?navButtonSelect=Directory&directory_mode=Clubs/Teams&directory_stage=:View%20List&refreshProtectionCode=0`,
+  },
+];
+
+export const buildDivisionSteps = (seasonName: string, divisions: DivisionDescriptor[]): WalkStep[] => {
+  const steps: WalkStep[] = [];
+  const seasonParam = encodeURIComponent(seasonName);
+  for (const d of divisions) {
+    steps.push({
+      kind: 'league-table',
+      url: `${BASE_SHELL}?navButtonSelect=${seasonParam}&tabIndex=0&refreshProtectionCode=0`,
+      divisionSlug: d.divisionSlug,
+    });
+    steps.push({
+      kind: 'fixtures-and-results',
+      url: `${BASE_FRAGMENT}displayResults.php?modeID=${d.upstreamModeId}&refreshProtectionCode=0`,
+      divisionId: d.divisionId,
+      modeId: d.upstreamModeId,
+    });
+    steps.push({
+      kind: 'player-rankings',
+      url: `${BASE_SHELL}?navButtonSelect=${seasonParam}&tabIndex=4&refreshProtectionCode=0`,
+      divisionSlug: d.divisionSlug,
+    });
+  }
+  return steps;
+};
+
+export const buildMatchCardStep = (fixtureId: number, resultCardUrl: string): WalkStep => ({
+  kind: 'match-card',
+  url: resultCardUrl,
+  fixtureId,
+});

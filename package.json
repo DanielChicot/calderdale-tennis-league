@@ -14,7 +14,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "parse": "pnpm --filter parse-cli exec tsx src/index.ts",
-    "capture": "tsx fixtures/capture.ts"
+    "capture": "tsx fixtures/capture.ts",
+    "db:dev": "docker run --rm -d --name ctl-db-dev -p 5433:5432 -e POSTGRES_USER=ctl -e POSTGRES_PASSWORD=ctl -e POSTGRES_DB=ctl postgres:16-alpine",
+    "db:dev:stop": "docker rm -f ctl-db-dev",
+    "db:migrate": "DATABASE_URL=postgres://ctl:ctl@localhost:5433/ctl pnpm --filter @ctl/db db:migrate"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

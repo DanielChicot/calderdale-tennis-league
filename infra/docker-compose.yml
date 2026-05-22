@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ctl}
+      POSTGRES_USER: ${POSTGRES_USER:-ctl}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - ctl-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ctl} -d ${POSTGRES_DB:-ctl}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ofelia:
+    image: mcuadros/ofelia:latest
+    restart: unless-stopped
+    command: daemon --docker
+    environment:
+      TZ: Europe/London
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - scraper
+
+  scraper:
+    image: ${SCRAPER_IMAGE:-ghcr.io/danielchicot/calderdale-league-scraper:latest}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-ctl}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ctl}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-run.scrape.schedule: "0 10 * * 4,0"
+      ofelia.job-run.scrape.container: ctl-scraper
+    container_name: ctl-scraper
+
+volumes:
+  ctl-pgdata:

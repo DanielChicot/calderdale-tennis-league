@@ -1,0 +1,17 @@
+{
+  "name": "@ctl/data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@ctl/db": "workspace:*",
+    "@ctl/domain": "workspace:*",
+    "drizzle-orm": "^0.36.0"
+  },
+  "devDependencies": {
+    "testcontainers": "^10.13.0"
+  }
+}

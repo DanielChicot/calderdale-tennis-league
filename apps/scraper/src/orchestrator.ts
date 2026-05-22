@@ -23,6 +23,8 @@ import {
 
 export type Orchestrator = {
   runCurrent: () => Promise<OrchestratorReport>;
+  runSeason: (seasonSlug: string) => Promise<OrchestratorReport>;
+  runBackfill: () => Promise<OrchestratorReport[]>;
 };
 
 export type OrchestratorReport = {
@@ -215,5 +217,65 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     return report;
   };
 
-  return { runCurrent };
+  const runSeason = async (seasonSlug: string): Promise<OrchestratorReport> => {
+    // Fetch home, detect + persist seasons
+    const homeStep = buildInitialSteps()[0]!;
+    const homeResult = await http.fetchPage(homeStep.url);
+    if (homeResult.kind !== 'changed') throw new Error('runSeason: cannot acquire home page');
+    await detectAndPersistSeasons(db, homeResult.html);
+
+    // Look up named season
+    const [season] = await db
+      .select()
+      .from(schema.seasons)
+      .where(eq(schema.seasons.slug, seasonSlug))
+      .limit(1);
+    if (!season) throw new Error(`runSeason: unknown season slug ${seasonSlug}`);
+
+    // Walk division steps for that season
+    const report: OrchestratorReport = {
+      stepsExecuted: 0,
+      stepsSkipped: 0,
+      parseFailures: 0,
+      currentSeasonId: season.id,
+    };
+    const divisions = await db
+      .select({ divisionId: schema.divisions.id, divisionSlug: schema.divisions.slug })
+      .from(schema.divisions)
+      .where(eq(schema.divisions.seasonId, season.id));
+    const descriptors: DivisionDescriptor[] = divisions.map((d) => ({
+      divisionId: d.divisionId,
+      divisionSlug: d.divisionSlug,
+      upstreamModeId: 0,
+    }));
+    for (const step of buildDivisionSteps(season.name, descriptors)) {
+      if (step.kind === 'fixtures-and-results' && step.modeId === 0) continue;
+      const outcome = await runStep(step);
+      outcome === 'executed'
+        ? report.stepsExecuted++
+        : outcome === 'skipped'
+          ? report.stepsSkipped++
+          : report.parseFailures++;
+    }
+    return report;
+  };
+
+  const runBackfill = async (): Promise<OrchestratorReport[]> => {
+    // Fetch home, persist seasons
+    const homeStep = buildInitialSteps()[0]!;
+    const homeResult = await http.fetchPage(homeStep.url);
+    if (homeResult.kind !== 'changed') throw new Error('runBackfill: cannot acquire home page');
+    await detectAndPersistSeasons(db, homeResult.html);
+
+    // Then run runSeason for every season in the DB
+    const allSeasons = await db.select({ slug: schema.seasons.slug }).from(schema.seasons);
+    const reports: OrchestratorReport[] = [];
+    for (const s of allSeasons) {
+      const report = await runSeason(s.slug);
+      reports.push(report);
+    }
+    return reports;
+  };
+
+  return { runCurrent, runSeason, runBackfill };
 };

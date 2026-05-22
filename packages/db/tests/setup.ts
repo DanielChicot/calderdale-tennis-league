@@ -17,10 +17,12 @@ export const startDb = async (): Promise<{ db: Database; url: string }> => {
       POSTGRES_PASSWORD: PG_PASSWORD,
     })
     .withExposedPorts(POSTGRES_PORT)
-    // Wait for the actual Postgres readiness log line, not just the TCP socket.
-    // TCP can accept before initdb's bootstrap script finishes, which races
-    // against subsequent migration tests.
-    .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections'))
+    // Wait for Postgres to be ready. The "ready to accept connections" message
+    // is logged twice on a fresh postgres:16-alpine: first by initdb on the
+    // unix socket, then again by the real server on TCP after the bootstrap
+    // restart. We need the second occurrence — the first races ahead of TCP
+    // binding and yields ECONNRESET.
+    .withWaitStrategy(Wait.forLogMessage(/database system is ready to accept connections/, 2))
     .start();
 
   const host = container.getHost();

@@ -2,6 +2,10 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    // The .ts import extensions in packages/db/src/schema/** are required by
+    // drizzle-kit 0.28's bundled esbuild-register (CJS resolution can't find
+    // the .js virtual files). Scoped review attempts (per-package + exclude)
+    // didn't suppress transitive type-checking, so the flag stays at root.
     "allowImportingTsExtensions": true
   },
   "include": ["**/*.ts"],

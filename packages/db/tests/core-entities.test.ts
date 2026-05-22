@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { eq, sql } from 'drizzle-orm';
 import { startDb, stopDb, getDb } from './setup.js';
-import { seasons, divisions, clubs, clubAliases, teams, players, playerAliases } from '../src/schema/index.js';
+import { seasons, clubs, clubAliases, players, playerAliases } from '../src/schema/index.js';
 
 describe('core entities round-trip', () => {
   beforeAll(async () => {

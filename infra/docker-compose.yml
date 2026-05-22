@@ -27,6 +27,9 @@ services:
 
   scraper:
     image: ${SCRAPER_IMAGE:-ghcr.io/danielchicot/calderdale-league-scraper:latest}
+    build:
+      context: ..
+      dockerfile: infra/scraper.Dockerfile
     restart: "no"
     depends_on:
       postgres:

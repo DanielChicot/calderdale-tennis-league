@@ -39,6 +39,25 @@ importers:
         specifier: workspace:*
         version: link:../../packages/parser
 
+  apps/scraper:
+    dependencies:
+      '@ctl/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@ctl/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@ctl/parser':
+        specifier: workspace:*
+        version: link:../../packages/parser
+      drizzle-orm:
+        specifier: ^0.36.0
+        version: 0.36.4(postgres@3.4.9)
+    devDependencies:
+      testcontainers:
+        specifier: ^10.13.0
+        version: 10.28.0
+
   packages/data:
     dependencies:
       '@ctl/db':

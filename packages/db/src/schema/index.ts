@@ -1,2 +1,5 @@
-// Schema modules are added one per entity in subsequent tasks.
-export {};
+export * from './seasons.ts';
+export * from './divisions.ts';
+export * from './clubs.ts';
+export * from './teams.ts';
+export * from './players.ts';

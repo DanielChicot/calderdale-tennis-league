@@ -15,6 +15,20 @@
       "when": 1779445385353,
       "tag": "0001_aromatic_prism",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779445548937,
+      "tag": "0002_loud_frightful_four",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779445556268,
+      "tag": "0003_stormy_matthew_murdock",
+      "breakpoints": true
     }
   ]
 }

@@ -5,3 +5,5 @@ export * from './teams.ts';
 export * from './players.ts';
 export * from './fixtures.ts';
 export * from './match-cards.ts';
+export * from './rankings.ts';
+export * from './scrape-runs.ts';

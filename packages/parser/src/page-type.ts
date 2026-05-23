@@ -29,11 +29,13 @@ export const detectFragmentType = (url: string): FragmentType => {
   if (u.host !== FRAGMENT_HOST) {
     throw new Error(`detectFragmentType: not a fragment URL: ${url}`);
   }
+  // Match on basename — upstream serves these fragments from both bare
+  // (/displayResults.php) and nested (/tennis-league/.../displayResults.php) paths.
   const path = u.pathname;
-  if (path === '/displayResults.php') return 'fixtures-and-results';
-  if (path === '/displayContacts.php') return 'club-contacts';
-  if (path === '/displayLocations.php') return 'club-location';
-  if (/^\/result_card_\d+\.php$/.test(path)) return 'match-card';
+  if (path.endsWith('/displayResults.php')) return 'fixtures-and-results';
+  if (path.endsWith('/displayContacts.php')) return 'club-contacts';
+  if (path.endsWith('/displayLocations.php')) return 'club-location';
+  if (/\/result_card_\d+\.php$/.test(path)) return 'match-card';
   throw new Error(`detectFragmentType: cannot classify ${url}`);
 };
 

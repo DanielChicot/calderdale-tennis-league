@@ -45,6 +45,18 @@ describe('detectFragmentType', () => {
     expect(detectFragmentType('https://www.ludus-online.com/result_card_3.php?fixture_id=999')).toBe('match-card');
   });
 
+  it('detects nested-path displayResults (the real upstream form)', () => {
+    expect(detectFragmentType(
+      'https://www.ludus-online.com/tennis-league/functions/administration/league/displayResults.php?modeID=8',
+    )).toBe('fixtures-and-results');
+  });
+
+  it('detects nested-path result_card', () => {
+    expect(detectFragmentType(
+      'https://www.ludus-online.com/tennis-league/functions/administration/league/result_card_39.php?fixture_id=127',
+    )).toBe('match-card');
+  });
+
   it('throws for unknown fragment URLs', () => {
     expect(() => detectFragmentType('https://www.ludus-online.com/random.php')).toThrow();
   });

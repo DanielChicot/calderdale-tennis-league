@@ -37,11 +37,23 @@ describe('parseSeasonNav', () => {
     expect(result.seasons.some((s) => /^(Summer|Winter)/.test(s.observedName))).toBe(true);
   });
 
-  it('finds no current season on bare-home fixture (Directory tab is selected, not a season)', async () => {
+  it('infers current from the solo top-nav season when no tab has the Current class', async () => {
+    // On the bare-home page, Directory is the selected tab — no season carries
+    // navWebObject_*Current. But the upstream nav only ever lists the live
+    // current season alongside Directory/Archive, so a solo top-nav season is
+    // unambiguously the current one.
     const html = await loadFixture('season-nav.html');
     const result = parseSeasonNav(html);
-    // The only tab present (Summer 2026) is NOT selected on the bare-home page
-    expect(result.current).toBeUndefined();
+    expect(result.current?.observedName).toBe('Summer 2026');
+  });
+
+  it('archive page still identifies the live season as current via the solo top-nav tab', async () => {
+    // The archive page's top nav is [Directory, Summer 2026, Archive(Current)].
+    // Even though the user is on the Archive tab, Summer 2026 is still the live
+    // current season — solo-tab inference picks it up correctly.
+    const html = await loadFixture('season-nav-archive.html');
+    const result = parseSeasonNav(html);
+    expect(result.current?.observedName).toBe('Summer 2026');
   });
 
   it('archive page yields multiple historical seasons', async () => {

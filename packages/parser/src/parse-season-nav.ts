@@ -20,6 +20,7 @@ const CURRENT_CLASSES = ['navWebObject_StartCurrent', 'navWebObject_MidCurrent',
 
 export const parseSeasonNav = (html: string): SeasonNavResult => {
   const $ = load(html);
+  const topNav: SeasonNavRow[] = [];
   const seen = new Map<string, SeasonNavRow>();
 
   // ── Top-level nav tabs ──────────────────────────────────────────────────────
@@ -39,9 +40,19 @@ export const parseSeasonNav = (html: string): SeasonNavResult => {
     const current = CURRENT_CLASSES.some((cls) => liClass.includes(cls));
 
     if (!seen.has(slug)) {
-      seen.set(slug, { observedName, slug, current });
+      const row = { observedName, slug, current };
+      topNav.push(row);
+      seen.set(slug, row);
     }
   });
+
+  // ── Inferred current ────────────────────────────────────────────────────────
+  // On the bare-home page Directory carries the Current class and no season tab
+  // does — but upstream only lists the live season in the top nav alongside
+  // Directory/Archive. So a solo top-nav season is unambiguously the current.
+  if (topNav.length === 1 && !topNav.some((s) => s.current)) {
+    topNav[0]!.current = true;
+  }
 
   // ── Archive sidebar ─────────────────────────────────────────────────────────
   // When the Archive tab is selected the page renders a sidebar with links of

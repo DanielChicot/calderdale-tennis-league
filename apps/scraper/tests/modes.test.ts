@@ -34,6 +34,8 @@ describe('orchestrator modes', () => {
     };
     const orch = createOrchestrator(getDb(), http);
     const report = await orch.runCurrent();
-    expect(report.currentSeasonId).toBe(0); // bare-home fixture has no season selected
+    // Bare-home fixture: Directory tab is selected, but solo-tab inference in
+    // parseSeasonNav identifies Summer 2026 as the live current season.
+    expect(report.currentSeasonId).toBeGreaterThan(0);
   });
 });

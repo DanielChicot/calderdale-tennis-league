@@ -156,6 +156,8 @@ describe('entity-resolver', () => {
     expect(id1).toBe(id2);
     const teams = await db.select().from(schema.teams);
     expect(teams).toHaveLength(1);
+    const clubs = await db.select().from(schema.clubs);
+    expect(clubs).toHaveLength(1);
   });
 });
 

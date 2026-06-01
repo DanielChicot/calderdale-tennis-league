@@ -84,9 +84,18 @@ export const resolveTeam = async (
   const clubName = stripTeamSuffix(observedName);
   const clubId = await resolveClub(db, clubName);
 
-  const [created] = await db
-    .insert(schema.teams)
-    .values({ slug, name: observedName, clubId, divisionId })
-    .returning();
-  return created!.id;
+  return db.transaction(async (tx) => {
+    const [recheck] = await tx
+      .select({ id: schema.teams.id })
+      .from(schema.teams)
+      .where(and(eq(schema.teams.slug, slug), eq(schema.teams.divisionId, divisionId)))
+      .limit(1);
+    if (recheck) return recheck.id;
+
+    const [created] = await tx
+      .insert(schema.teams)
+      .values({ slug, name: observedName, clubId, divisionId })
+      .returning();
+    return created!.id;
+  });
 };

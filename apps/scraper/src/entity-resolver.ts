@@ -60,3 +60,10 @@ export const resolvePlayer = async (db: Database, observedName: string, clubId: 
     return playerId;
   });
 };
+
+const TEAM_SUFFIX_REGEX = /^(.*\S)\s+[A-Z]$/;
+
+export const stripTeamSuffix = (observedName: string): string => {
+  const match = TEAM_SUFFIX_REGEX.exec(observedName);
+  return match ? match[1]! : observedName;
+};

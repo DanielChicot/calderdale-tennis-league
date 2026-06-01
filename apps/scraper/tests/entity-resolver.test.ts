@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { startDb, stopDb, getDb } from './setup.js';
 import { schema } from '@ctl/db';
-import { resolveClub, resolvePlayer } from '../src/entity-resolver.js';
+import { resolveClub, resolvePlayer, stripTeamSuffix } from '../src/entity-resolver.js';
 
 describe('entity-resolver', () => {
   beforeAll(async () => {
@@ -85,5 +85,25 @@ describe('entity-resolver', () => {
     const aliases = await db.select().from(schema.playerAliases);
     expect(aliases).toHaveLength(1);
     expect(aliases[0]).toMatchObject({ playerId, observedName: 'Jane Smith' });
+  });
+});
+
+describe('stripTeamSuffix', () => {
+  it('strips a trailing single capital letter', () => {
+    expect(stripTeamSuffix('Halifax Queens A')).toBe('Halifax Queens');
+    expect(stripTeamSuffix('Halifax Queens B')).toBe('Halifax Queens');
+  });
+
+  it('returns the name unchanged when no trailing letter token', () => {
+    expect(stripTeamSuffix('Akroydon')).toBe('Akroydon');
+    expect(stripTeamSuffix('Halifax Queens Reserves')).toBe('Halifax Queens Reserves');
+  });
+
+  it('handles single-word club + letter ("X B")', () => {
+    expect(stripTeamSuffix('X B')).toBe('X');
+  });
+
+  it('ignores trailing lowercase letters (only capital is a suffix marker)', () => {
+    expect(stripTeamSuffix('Akroydon a')).toBe('Akroydon a');
   });
 });

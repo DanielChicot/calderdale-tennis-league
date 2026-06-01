@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { startDb, stopDb, getDb } from './setup.js';
 import { schema } from '@ctl/db';
-import { resolveClub, resolvePlayer, stripTeamSuffix } from '../src/entity-resolver.js';
+import { resolveClub, resolvePlayer, resolveTeam, stripTeamSuffix } from '../src/entity-resolver.js';
 
 describe('entity-resolver', () => {
   beforeAll(async () => {
@@ -14,7 +14,7 @@ describe('entity-resolver', () => {
 
   beforeEach(async () => {
     const db = getDb();
-    await db.execute(sql`TRUNCATE clubs RESTART IDENTITY CASCADE`);
+    await db.execute(sql`TRUNCATE seasons, divisions, clubs, club_aliases, teams, players, player_aliases RESTART IDENTITY CASCADE`);
   });
 
   it('known alias → returns existing club id', async () => {
@@ -85,6 +85,77 @@ describe('entity-resolver', () => {
     const aliases = await db.select().from(schema.playerAliases);
     expect(aliases).toHaveLength(1);
     expect(aliases[0]).toMatchObject({ playerId, observedName: 'Jane Smith' });
+  });
+
+  it('resolveTeam: known club → creates team with correct club_id', async () => {
+    const db = getDb();
+    const [club] = await db
+      .insert(schema.clubs)
+      .values({ slug: 'halifax-queens', canonicalName: 'Queens Sports Club' })
+      .returning();
+    await db
+      .insert(schema.clubAliases)
+      .values({ clubId: club!.id, observedName: 'Halifax Queens' });
+    const [season] = await db.insert(schema.seasons).values({ slug: 's', name: 'S', current: true }).returning();
+    const [division] = await db
+      .insert(schema.divisions)
+      .values({ slug: 'mens-1', name: 'Mens Division 1', group: 'Mens', seasonId: season!.id, upstreamModeId: 8 })
+      .returning();
+
+    const teamId = await resolveTeam(db, 'Halifax Queens A', division!.id);
+
+    const teams = await db.select().from(schema.teams);
+    expect(teams).toHaveLength(1);
+    expect(teams[0]).toMatchObject({
+      id: teamId,
+      slug: 'halifax-queens-a',
+      name: 'Halifax Queens A',
+      clubId: club!.id,
+      divisionId: division!.id,
+    });
+  });
+
+  it('resolveTeam: unknown club → tentative club + team, linked', async () => {
+    const db = getDb();
+    const [season] = await db.insert(schema.seasons).values({ slug: 's2', name: 'S2', current: true }).returning();
+    const [division] = await db
+      .insert(schema.divisions)
+      .values({ slug: 'mens-1', name: 'Mens Division 1', group: 'Mens', seasonId: season!.id, upstreamModeId: 8 })
+      .returning();
+
+    const teamId = await resolveTeam(db, 'Mystery Players B', division!.id);
+
+    const clubs = await db.select().from(schema.clubs);
+    expect(clubs).toHaveLength(1);
+    expect(clubs[0]).toMatchObject({
+      slug: 'mystery-players',
+      canonicalName: 'Mystery Players',
+      needsReview: true,
+    });
+    const teams = await db.select().from(schema.teams);
+    expect(teams).toHaveLength(1);
+    expect(teams[0]).toMatchObject({
+      id: teamId,
+      slug: 'mystery-players-b',
+      name: 'Mystery Players B',
+      clubId: clubs[0]!.id,
+      divisionId: division!.id,
+    });
+  });
+
+  it('resolveTeam: idempotent — same (name, divisionId) returns same id', async () => {
+    const db = getDb();
+    const [season] = await db.insert(schema.seasons).values({ slug: 's3', name: 'S3', current: true }).returning();
+    const [division] = await db
+      .insert(schema.divisions)
+      .values({ slug: 'mens-1', name: 'Mens Division 1', group: 'Mens', seasonId: season!.id, upstreamModeId: 8 })
+      .returning();
+
+    const id1 = await resolveTeam(db, 'Akroydon A', division!.id);
+    const id2 = await resolveTeam(db, 'Akroydon A', division!.id);
+    expect(id1).toBe(id2);
+    const teams = await db.select().from(schema.teams);
+    expect(teams).toHaveLength(1);
   });
 });
 

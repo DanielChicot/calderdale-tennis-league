@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Database } from '@ctl/db';
 import { schema } from '@ctl/db';
 import { slugify } from '@ctl/parser';
@@ -66,4 +66,27 @@ const TEAM_SUFFIX_REGEX = /^(.*\S)\s+[A-Z]$/;
 export const stripTeamSuffix = (observedName: string): string => {
   const match = TEAM_SUFFIX_REGEX.exec(observedName);
   return match ? match[1]! : observedName;
+};
+
+export const resolveTeam = async (
+  db: Database,
+  observedName: string,
+  divisionId: number,
+): Promise<number> => {
+  const slug = slugify(observedName);
+  const [existing] = await db
+    .select({ id: schema.teams.id })
+    .from(schema.teams)
+    .where(and(eq(schema.teams.slug, slug), eq(schema.teams.divisionId, divisionId)))
+    .limit(1);
+  if (existing) return existing.id;
+
+  const clubName = stripTeamSuffix(observedName);
+  const clubId = await resolveClub(db, clubName);
+
+  const [created] = await db
+    .insert(schema.teams)
+    .values({ slug, name: observedName, clubId, divisionId })
+    .returning();
+  return created!.id;
 };

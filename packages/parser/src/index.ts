@@ -23,3 +23,5 @@ export { parseClubContacts } from './parse-club-contacts.js';
 export type { ClubContactRow } from './parse-club-contacts.js';
 export { parseClubLocation } from './parse-club-location.js';
 export type { ClubLocationRow } from './parse-club-location.js';
+export { parseDivisionsDropdown } from './parse-divisions-dropdown.js';
+export type { DivisionsDropdownRow } from './parse-divisions-dropdown.js';

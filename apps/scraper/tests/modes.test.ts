@@ -36,6 +36,11 @@ describe('orchestrator modes', () => {
         if (url.includes('navButtonSelect=Directory')) {
           return { kind: 'changed' as const, status: 200, html: clubsDir, contentHash: 'clubs' };
         }
+        // contentHash values are .slice(0, 64) to fit scrape_runs.content_hash varchar(64) —
+        // real HTTP client uses 64-char SHA-256 hex digests; URL-embedding test hashes can exceed that.
+        // The tabIndex=0 branch catches BOTH the divisions-discovery step and the per-division
+        // league-table steps — they share the same URL by design. The league-table fixture
+        // contains the divisions dropdown, so divisions-discovery's parser finds what it needs.
         if (url.includes('tabIndex=0')) {
           return { kind: 'changed' as const, status: 200, html: leagueTable, contentHash: `lt:${url}`.slice(0, 64) };
         }

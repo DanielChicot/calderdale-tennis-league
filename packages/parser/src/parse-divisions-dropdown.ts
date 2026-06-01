@@ -27,7 +27,7 @@ export const parseDivisionsDropdown = (html: string): DivisionsDropdownRow[] => 
     rows.push({
       observedName,
       modeId,
-      group: match[1] as 'Mens' | 'Ladies' | 'Mixed',
+      group: match[1]! as 'Mens' | 'Ladies' | 'Mixed',
       slug: slugify(observedName),
     });
   });

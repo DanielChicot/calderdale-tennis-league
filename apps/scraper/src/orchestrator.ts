@@ -3,6 +3,7 @@ import type { Database } from '@ctl/db';
 import { schema } from '@ctl/db';
 import {
   parseClubsDirectory,
+  parseDivisionsDropdown,
   parseFixturesAndResults,
   parseMatchCard,
   parseClubContacts,
@@ -16,6 +17,7 @@ import { resolveClub } from './entity-resolver.js';
 import {
   buildInitialSteps,
   buildDivisionSteps,
+  buildDivisionsDiscoveryStep,
   buildMatchCardStep,
   type WalkStep,
   type DivisionDescriptor,
@@ -119,6 +121,33 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         }
         return;
       }
+      case 'divisions-discovery': {
+        const rows = parseDivisionsDropdown(html);
+        // Pin to the current season — division uniqueness is (slug, season_id) and
+        // (upstream_mode_id, season_id), so a re-run for the same season is idempotent.
+        const [currentSeason] = await db
+          .select({ id: schema.seasons.id })
+          .from(schema.seasons)
+          .where(eq(schema.seasons.current, true))
+          .limit(1);
+        if (!currentSeason) throw new Error('divisions-discovery: no current season set');
+        for (const row of rows) {
+          await db
+            .insert(schema.divisions)
+            .values({
+              slug: row.slug,
+              name: row.observedName,
+              group: row.group,
+              seasonId: currentSeason.id,
+              upstreamModeId: row.modeId,
+            })
+            .onConflictDoUpdate({
+              target: [schema.divisions.slug, schema.divisions.seasonId],
+              set: { name: row.observedName, upstreamModeId: row.modeId, group: row.group },
+            });
+        }
+        return;
+      }
       case 'fixtures-and-results': {
         parseFixturesAndResults(html);
         // Resolve teams via club aliases (team name is also the club's team name in this league)
@@ -188,28 +217,34 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     const r = await runStep(clubsStep);
     r === 'executed' ? report.stepsExecuted++ : r === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
 
+    // 2b. discover divisions from the league-table page
+    const [currentSeasonRow] = await db
+      .select({ name: schema.seasons.name })
+      .from(schema.seasons)
+      .where(eq(schema.seasons.id, detection.currentSeasonId))
+      .limit(1);
+    if (!currentSeasonRow) throw new Error('runCurrent: current season lookup failed');
+    const discStep = buildDivisionsDiscoveryStep(currentSeasonRow.name);
+    const dr = await runStep(discStep);
+    dr === 'executed' ? report.stepsExecuted++ : dr === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+
     // 3. Division-level steps for the current season
     const divisions = await db
       .select({
         divisionId: schema.divisions.id,
         divisionSlug: schema.divisions.slug,
+        upstreamModeId: schema.divisions.upstreamModeId,
       })
       .from(schema.divisions)
       .where(eq(schema.divisions.seasonId, detection.currentSeasonId));
 
-    // Phase 2 minimum: upstream modeID-per-division is read from a static seed file
-    // OR discovered by parsing the home page season nav. For now, the orchestrator
-    // assumes a `division.upstream_mode_id` column will be added in a follow-up — and
-    // skips division-level steps if no mapping is available. This is a known
-    // limitation, called out in the spec.
     const descriptors: DivisionDescriptor[] = divisions.map((d) => ({
       divisionId: d.divisionId,
       divisionSlug: d.divisionSlug,
-      upstreamModeId: 0,        // placeholder — populated when known
+      upstreamModeId: d.upstreamModeId,
     }));
-    const divisionSteps = buildDivisionSteps('Summer 2026', descriptors);
+    const divisionSteps = buildDivisionSteps(currentSeasonRow.name, descriptors);
     for (const step of divisionSteps) {
-      if (step.kind === 'fixtures-and-results' && step.modeId === 0) continue;
       const outcome = await runStep(step);
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
@@ -240,16 +275,19 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       currentSeasonId: season.id,
     };
     const divisions = await db
-      .select({ divisionId: schema.divisions.id, divisionSlug: schema.divisions.slug })
+      .select({
+        divisionId: schema.divisions.id,
+        divisionSlug: schema.divisions.slug,
+        upstreamModeId: schema.divisions.upstreamModeId,
+      })
       .from(schema.divisions)
       .where(eq(schema.divisions.seasonId, season.id));
     const descriptors: DivisionDescriptor[] = divisions.map((d) => ({
       divisionId: d.divisionId,
       divisionSlug: d.divisionSlug,
-      upstreamModeId: 0,
+      upstreamModeId: d.upstreamModeId,
     }));
     for (const step of buildDivisionSteps(season.name, descriptors)) {
-      if (step.kind === 'fixtures-and-results' && step.modeId === 0) continue;
       const outcome = await runStep(step);
       outcome === 'executed'
         ? report.stepsExecuted++

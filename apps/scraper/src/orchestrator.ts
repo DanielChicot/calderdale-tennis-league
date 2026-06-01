@@ -160,36 +160,42 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
             skipped++;
             continue;
           }
+          // Team resolution runs OUTSIDE the per-fixture transaction. resolveTeam has
+          // its own transaction internally and is idempotent — wrapping it again here
+          // would either nest transactions (drizzle/postgres-js doesn't support that
+          // cleanly) or block. The fixture+results pair IS atomic via this tx.
           const homeTeamId = await resolveTeam(db, row.homeTeamName, step.divisionId);
           const awayTeamId = await resolveTeam(db, row.awayTeamName, step.divisionId);
-          const [fixture] = await db
-            .insert(schema.fixtures)
-            .values({
-              upstreamId: row.fixtureRef.id,
-              date: row.date,
-              homeTeamId,
-              awayTeamId,
-              divisionId: step.divisionId,
-              status: row.status,
-            })
-            .onConflictDoUpdate({
-              target: schema.fixtures.upstreamId,
-              set: { date: row.date, status: row.status, homeTeamId, awayTeamId, divisionId: step.divisionId },
-            })
-            .returning();
-          if (row.score) {
-            await db
-              .insert(schema.results)
+          await db.transaction(async (tx) => {
+            const [fixture] = await tx
+              .insert(schema.fixtures)
               .values({
-                fixtureId: fixture!.id,
-                homeScore: String(row.score.home),
-                awayScore: String(row.score.away),
+                upstreamId: row.fixtureRef!.id,
+                date: row.date,
+                homeTeamId,
+                awayTeamId,
+                divisionId: step.divisionId,
+                status: row.status,
               })
               .onConflictDoUpdate({
-                target: schema.results.fixtureId,
-                set: { homeScore: String(row.score.home), awayScore: String(row.score.away) },
-              });
-          }
+                target: schema.fixtures.upstreamId,
+                set: { date: row.date, status: row.status, homeTeamId, awayTeamId, divisionId: step.divisionId },
+              })
+              .returning();
+            if (row.score) {
+              await tx
+                .insert(schema.results)
+                .values({
+                  fixtureId: fixture!.id,
+                  homeScore: String(row.score.home),
+                  awayScore: String(row.score.away),
+                })
+                .onConflictDoUpdate({
+                  target: schema.results.fixtureId,
+                  set: { homeScore: String(row.score.home), awayScore: String(row.score.away) },
+                });
+            }
+          });
         }
         if (skipped > 0) {
           console.warn(`[orchestrator] fixtures-and-results: skipped ${skipped} row(s) without fixtureRef (division ${step.divisionId})`);

@@ -25,7 +25,7 @@ describe('match data round-trip', () => {
     const db = getDb();
     await db.execute(sql`TRUNCATE seasons, divisions, clubs, club_aliases, teams, players, player_aliases, fixtures, results, match_cards, rubbers, set_scores RESTART IDENTITY CASCADE`);
     const [season] = await db.insert(seasons).values({ slug: 's', name: 'S', current: true }).returning();
-    const [division] = await db.insert(divisions).values({ slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id }).returning();
+    const [division] = await db.insert(divisions).values({ slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id, upstreamModeId: 1 }).returning();
     divisionId = division!.id;
     const [club] = await db.insert(clubs).values({ slug: 'c', canonicalName: 'C' }).returning();
     const [home, away] = await db.insert(teams).values([

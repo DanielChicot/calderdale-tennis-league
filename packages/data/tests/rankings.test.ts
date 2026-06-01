@@ -22,7 +22,7 @@ describe('rankings getters', () => {
     const db = getDb();
     const [season] = await db.insert(schema.seasons).values({ slug: 's', name: 'S', current: true }).returning();
     const [division] = await db.insert(schema.divisions).values({
-      slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id,
+      slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id, upstreamModeId: 1,
     }).returning();
     const [club] = await db.insert(schema.clubs).values({ slug: 'c', canonicalName: 'C' }).returning();
     const [alice] = await db.insert(schema.players).values({ slug: 'alice', name: 'Alice', clubId: club!.id }).returning();
@@ -65,7 +65,7 @@ describe('rankings getters', () => {
     const db = getDb();
     const [season] = await db.insert(schema.seasons).values({ slug: 's', name: 'S', current: true }).returning();
     const [division] = await db.insert(schema.divisions).values({
-      slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id,
+      slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id, upstreamModeId: 1,
     }).returning();
     const [club] = await db.insert(schema.clubs).values({ slug: 'c', canonicalName: 'C' }).returning();
     const [player] = await db.insert(schema.players).values({ slug: 'alice', name: 'Alice', clubId: club!.id }).returning();

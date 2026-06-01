@@ -21,7 +21,7 @@ describe('fixtures getters', () => {
     const db = getDb();
     const [season] = await db.insert(schema.seasons).values({ slug: 's', name: 'S', current: true }).returning();
     const [division] = await db.insert(schema.divisions).values({
-      slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id,
+      slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id, upstreamModeId: 1,
     }).returning();
     const [club] = await db.insert(schema.clubs).values({ slug: 'c', canonicalName: 'C' }).returning();
     const [home] = await db.insert(schema.teams).values({ slug: 'home', name: 'Home', clubId: club!.id, divisionId: division!.id }).returning();
@@ -44,7 +44,7 @@ describe('fixtures getters', () => {
     const db = getDb();
     const [season] = await db.insert(schema.seasons).values({ slug: 's', name: 'S', current: true }).returning();
     const [division] = await db.insert(schema.divisions).values({
-      slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id,
+      slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id, upstreamModeId: 1,
     }).returning();
     const [club] = await db.insert(schema.clubs).values({ slug: 'c', canonicalName: 'C' }).returning();
     const [home] = await db.insert(schema.teams).values({ slug: 'home', name: 'Home', clubId: club!.id, divisionId: division!.id }).returning();

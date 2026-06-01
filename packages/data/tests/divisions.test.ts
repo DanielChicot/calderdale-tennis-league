@@ -17,8 +17,8 @@ describe('divisions getters', () => {
     const db = getDb();
     const [season] = await db.insert(schema.seasons).values({ slug: 's', name: 'S', current: true }).returning();
     await db.insert(schema.divisions).values([
-      { slug: 'mens-1', name: 'Mens Division 1', group: 'Mens', seasonId: season!.id },
-      { slug: 'mens-2', name: 'Mens Division 2', group: 'Mens', seasonId: season!.id },
+      { slug: 'mens-1', name: 'Mens Division 1', group: 'Mens', seasonId: season!.id, upstreamModeId: 1 },
+      { slug: 'mens-2', name: 'Mens Division 2', group: 'Mens', seasonId: season!.id, upstreamModeId: 2 },
     ]);
     const list = await listDivisions(db, season!.id);
     expect(list.map((d) => d.slug)).toEqual(['mens-1', 'mens-2']);
@@ -32,7 +32,7 @@ describe('divisions getters', () => {
     const db = getDb();
     const [season] = await db.insert(schema.seasons).values({ slug: 's', name: 'S', current: true }).returning();
     const [division] = await db.insert(schema.divisions).values({
-      slug: 'mens-1', name: 'Mens Division 1', group: 'Mens', seasonId: season!.id,
+      slug: 'mens-1', name: 'Mens Division 1', group: 'Mens', seasonId: season!.id, upstreamModeId: 1,
     }).returning();
     const [club] = await db.insert(schema.clubs).values({ slug: 'c', canonicalName: 'C' }).returning();
     await db.insert(schema.teams).values([

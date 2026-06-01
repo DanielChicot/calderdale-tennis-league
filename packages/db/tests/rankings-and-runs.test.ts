@@ -34,7 +34,7 @@ describe('rankings + scrape_runs + seed', () => {
     const db = getDb();
     await db.execute(sql`TRUNCATE seasons, divisions, clubs, club_aliases, teams, players, player_aliases, rankings RESTART IDENTITY CASCADE`);
     const [season] = await db.insert(seasons).values({ slug: 's', name: 'S', current: true }).returning();
-    const [division] = await db.insert(divisions).values({ slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id }).returning();
+    const [division] = await db.insert(divisions).values({ slug: 'd', name: 'D', group: 'Mens', seasonId: season!.id, upstreamModeId: 1 }).returning();
     const [club] = await db.insert(clubs).values({ slug: 'c', canonicalName: 'C' }).returning();
     const [player] = await db.insert(players).values({ slug: 'p', name: 'P', clubId: club!.id }).returning();
     await db.insert(rankings).values({

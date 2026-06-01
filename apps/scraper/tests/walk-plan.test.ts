@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildInitialSteps, buildDivisionSteps, buildMatchCardStep } from '../src/walk-plan.js';
+import { buildInitialSteps, buildDivisionSteps, buildMatchCardStep, buildDivisionsDiscoveryStep } from '../src/walk-plan.js';
 
 describe('walk plan', () => {
   it('initial steps include season-nav and clubs-directory in order', () => {
@@ -23,6 +23,16 @@ describe('walk plan', () => {
     expect(step.kind).toBe('match-card');
     if (step.kind === 'match-card') {
       expect(step.fixtureId).toBe(99);
+    }
+  });
+
+  it('divisions discovery step uses the league-table URL for the named season', () => {
+    const step = buildDivisionsDiscoveryStep('Summer 2026');
+    expect(step.kind).toBe('divisions-discovery');
+    if (step.kind === 'divisions-discovery') {
+      expect(step.url).toContain('navButtonSelect=Summer%202026');
+      expect(step.url).toContain('tabIndex=0');
+      expect(step.url).toContain('refreshProtectionCode=0');
     }
   });
 });

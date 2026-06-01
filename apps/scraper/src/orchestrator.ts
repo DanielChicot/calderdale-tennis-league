@@ -13,7 +13,7 @@ import {
 } from '@ctl/parser';
 import { createScrapeHttpClient, type ScrapeHttpClient } from './http-client.js';
 import { detectAndPersistSeasons } from './season-detector.js';
-import { resolveClub } from './entity-resolver.js';
+import { resolveClub, resolveTeam } from './entity-resolver.js';
 import {
   buildInitialSteps,
   buildDivisionSteps,
@@ -153,11 +153,47 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         return;
       }
       case 'fixtures-and-results': {
-        parseFixturesAndResults(html);
-        // Resolve teams via club aliases (team name is also the club's team name in this league)
-        // For Phase 2 minimum: upsert fixture, skip team FK resolution if teams not yet seeded.
-        // Teams are created when the league table is parsed (not yet implemented in this minimum).
-        // This is a known gap — see follow-up Phase 2 task on league-table → teams seeding.
+        const rows = parseFixturesAndResults(html);
+        let skipped = 0;
+        for (const row of rows) {
+          if (!row.fixtureRef) {
+            skipped++;
+            continue;
+          }
+          const homeTeamId = await resolveTeam(db, row.homeTeamName, step.divisionId);
+          const awayTeamId = await resolveTeam(db, row.awayTeamName, step.divisionId);
+          const [fixture] = await db
+            .insert(schema.fixtures)
+            .values({
+              upstreamId: row.fixtureRef.id,
+              date: row.date,
+              homeTeamId,
+              awayTeamId,
+              divisionId: step.divisionId,
+              status: row.status,
+            })
+            .onConflictDoUpdate({
+              target: schema.fixtures.upstreamId,
+              set: { date: row.date, status: row.status, homeTeamId, awayTeamId, divisionId: step.divisionId },
+            })
+            .returning();
+          if (row.score) {
+            await db
+              .insert(schema.results)
+              .values({
+                fixtureId: fixture!.id,
+                homeScore: String(row.score.home),
+                awayScore: String(row.score.away),
+              })
+              .onConflictDoUpdate({
+                target: schema.results.fixtureId,
+                set: { homeScore: String(row.score.home), awayScore: String(row.score.away) },
+              });
+          }
+        }
+        if (skipped > 0) {
+          console.warn(`[orchestrator] fixtures-and-results: skipped ${skipped} row(s) without fixtureRef (division ${step.divisionId})`);
+        }
         return;
       }
       case 'match-card': {

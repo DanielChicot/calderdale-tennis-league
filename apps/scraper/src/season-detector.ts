@@ -5,6 +5,7 @@ import { parseSeasonNav } from '@ctl/parser';
 
 export type SeasonDetectionResult = {
   currentSeasonId: number;
+  currentSeasonName: string;
   totalSeasons: number;
 };
 
@@ -39,6 +40,10 @@ export const detectAndPersistSeasons = async (
       }
     }
 
-    return { currentSeasonId, totalSeasons: seasons.length };
+    return {
+      currentSeasonId,
+      currentSeasonName: current?.observedName ?? '',
+      totalSeasons: seasons.length,
+    };
   });
 };

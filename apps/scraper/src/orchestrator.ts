@@ -122,6 +122,10 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         return;
       }
       case 'divisions-discovery': {
+        // INVARIANT: only scheduled from runCurrent, after detectAndPersistSeasons has
+        // set current=true for the desired season. Do NOT schedule from runSeason
+        // or runBackfill — the handler keys off seasons.current=true and would
+        // overwrite divisions for the wrong season.
         const rows = parseDivisionsDropdown(html);
         // Pin to the current season — division uniqueness is (slug, season_id) and
         // (upstream_mode_id, season_id), so a re-run for the same season is idempotent.
@@ -218,13 +222,7 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     r === 'executed' ? report.stepsExecuted++ : r === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
 
     // 2b. discover divisions from the league-table page
-    const [currentSeasonRow] = await db
-      .select({ name: schema.seasons.name })
-      .from(schema.seasons)
-      .where(eq(schema.seasons.id, detection.currentSeasonId))
-      .limit(1);
-    if (!currentSeasonRow) throw new Error('runCurrent: current season lookup failed');
-    const discStep = buildDivisionsDiscoveryStep(currentSeasonRow.name);
+    const discStep = buildDivisionsDiscoveryStep(detection.currentSeasonName);
     const dr = await runStep(discStep);
     dr === 'executed' ? report.stepsExecuted++ : dr === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
 
@@ -243,7 +241,7 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       divisionSlug: d.divisionSlug,
       upstreamModeId: d.upstreamModeId,
     }));
-    const divisionSteps = buildDivisionSteps(currentSeasonRow.name, descriptors);
+    const divisionSteps = buildDivisionSteps(detection.currentSeasonName, descriptors);
     for (const step of divisionSteps) {
       const outcome = await runStep(step);
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
@@ -274,6 +272,9 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       parseFailures: 0,
       currentSeasonId: season.id,
     };
+    // NOTE: divisions-discovery is intentionally omitted here — runSeason consumes
+    // divisions already persisted by a prior runCurrent. Adding it would risk
+    // writing rows for the wrong season (see invariant in handleStep above).
     const divisions = await db
       .select({
         divisionId: schema.divisions.id,

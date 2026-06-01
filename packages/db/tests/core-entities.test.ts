@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { eq, sql } from 'drizzle-orm';
 import { startDb, stopDb, getDb } from './setup.js';
-import { seasons, clubs, clubAliases, players, playerAliases } from '../src/schema/index.js';
+import { seasons, clubs, clubAliases, players, playerAliases, divisions } from '../src/schema/index.js';
 
 describe('core entities round-trip', () => {
   beforeAll(async () => {
@@ -50,6 +50,28 @@ describe('core entities round-trip', () => {
     await expect(
       db.execute(sql`INSERT INTO divisions (slug, name, "group", season_id) VALUES ('d', 'D', 'Junior', ${season!.id})`),
     ).rejects.toThrow();
+  });
+
+  it('divisions.upstream_mode_id is required and unique within a season', async () => {
+    const db = getDb();
+    const [season] = await db.insert(seasons).values({ slug: 's', name: 'S', current: true }).returning();
+    await db.execute(
+      sql`INSERT INTO divisions (slug, name, "group", season_id, upstream_mode_id)
+          VALUES ('d1', 'D1', 'Mens', ${season!.id}, 8)`,
+    );
+    // Duplicate (upstream_mode_id, season_id) must be rejected
+    await expect(
+      db.execute(
+        sql`INSERT INTO divisions (slug, name, "group", season_id, upstream_mode_id)
+            VALUES ('d2', 'D2', 'Mens', ${season!.id}, 8)`,
+      ),
+    ).rejects.toThrow();
+    // Same mode_id across a different season is fine
+    const [s2] = await db.insert(seasons).values({ slug: 's2', name: 'S2', current: false }).returning();
+    await db.execute(
+      sql`INSERT INTO divisions (slug, name, "group", season_id, upstream_mode_id)
+          VALUES ('d2', 'D2', 'Mens', ${s2!.id}, 8)`,
+    );
   });
 
   it('player alias prevents duplicate observed names', async () => {

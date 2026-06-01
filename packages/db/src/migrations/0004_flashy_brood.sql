@@ -1,0 +1,2 @@
+ALTER TABLE "divisions" ADD COLUMN "upstream_mode_id" integer NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "divisions_upstream_mode_id_season_idx" ON "divisions" USING btree ("upstream_mode_id","season_id");

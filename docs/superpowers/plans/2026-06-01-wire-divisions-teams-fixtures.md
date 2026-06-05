@@ -19,7 +19,7 @@
 - Create: `packages/parser/tests/parse-divisions-dropdown.test.ts`
 - Modify: `packages/parser/src/index.ts` (add export)
 
-**Context:** The league-table page contains a `<select name="season_subNav_division">` with `<option value="<modeID>">Mens Division 1</option>` etc. We parse all 9 options from the existing `fixtures/league-table-mixed-div-1.html` fixture. Cheerio is imported as named `load` for tree-shaking. `slugify` lives in `packages/parser/src/helpers.ts`.
+**Context:** The league-table page contains a `<select name="season_subNav_my_division">` with `<option value="<modeID>">Mens Division 1</option>` etc. We parse all 9 options from the existing `fixtures/league-table-mixed-div-1.html` fixture. Cheerio is imported as named `load` for tree-shaking. `slugify` lives in `packages/parser/src/helpers.ts`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -67,7 +67,7 @@ describe('parseDivisionsDropdown', () => {
 
   it('skips options without a numeric value (placeholders)', () => {
     const html = `
-      <select name="season_subNav_division">
+      <select name="season_subNav_my_division">
         <option id="0">select a division...</option>
         <option value="8">Mens Division 1</option>
       </select>
@@ -77,7 +77,7 @@ describe('parseDivisionsDropdown', () => {
 
   it('skips options whose text does not start with Mens/Ladies/Mixed', () => {
     const html = `
-      <select name="season_subNav_division">
+      <select name="season_subNav_my_division">
         <option value="99">Tournament Cup</option>
         <option value="8">Mens Division 1</option>
       </select>
@@ -115,7 +115,7 @@ export const parseDivisionsDropdown = (html: string): DivisionsDropdownRow[] => 
   const $ = load(html);
   const rows: DivisionsDropdownRow[] = [];
 
-  $('select[name="season_subNav_division"] option').each((_, el) => {
+  $('select[name="season_subNav_my_division"] option').each((_, el) => {
     const valueAttr = $(el).attr('value');
     if (!valueAttr) return;
     const modeId = Number(valueAttr);
@@ -747,7 +747,7 @@ Replace with:
 - [ ] **Step 6: Run the full suite to confirm no regression**
 
 Run: `pnpm test`
-Expected: all tests pass. The orchestrator `modes.test.ts` test from earlier (`runCurrent populates seasons and runs without throwing`) still passes because its mock `fetchPage` returns `clubsDir` for any URL not equal to the home page — which now includes the new divisions-discovery URL. It'll attempt to parse `clubsDir` as a dropdown and find no `<select name="season_subNav_division">` elements → empty `rows` → no inserts → handler returns cleanly. Don't change the test in this task.
+Expected: all tests pass. The orchestrator `modes.test.ts` test from earlier (`runCurrent populates seasons and runs without throwing`) still passes because its mock `fetchPage` returns `clubsDir` for any URL not equal to the home page — which now includes the new divisions-discovery URL. It'll attempt to parse `clubsDir` as a dropdown and find no `<select name="season_subNav_my_division">` elements → empty `rows` → no inserts → handler returns cleanly. Don't change the test in this task.
 
 - [ ] **Step 7: Commit**
 
@@ -888,13 +888,13 @@ Replace the body of the existing `describe('orchestrator modes', ...)` in `apps/
           return { kind: 'changed' as const, status: 200, html: clubsDir, contentHash: 'clubs' };
         }
         if (url.includes('tabIndex=0')) {
-          return { kind: 'changed' as const, status: 200, html: leagueTable, contentHash: `lt:${url}` };
+          return { kind: 'changed' as const, status: 200, html: leagueTable, contentHash: `lt:${url}`.slice(0, 64) };
         }
         if (url.includes('displayResults.php')) {
-          return { kind: 'changed' as const, status: 200, html: fixturesAndResults, contentHash: `fr:${url}` };
+          return { kind: 'changed' as const, status: 200, html: fixturesAndResults, contentHash: `fr:${url}`.slice(0, 64) };
         }
         // tabIndex=4 (player-rankings), match-card etc — keep no-op
-        return { kind: 'changed' as const, status: 200, html: '<html></html>', contentHash: `other:${url}` };
+        return { kind: 'changed' as const, status: 200, html: '<html></html>', contentHash: `ot:${url}`.slice(0, 64) };
       }),
     };
     const orch = createOrchestrator(getDb(), http);

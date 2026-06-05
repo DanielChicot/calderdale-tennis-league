@@ -17,7 +17,9 @@ export type DivisionDescriptor = {
 };
 
 const BASE_SHELL = 'https://www.calderdale.tennis-league.org/';
-const BASE_FRAGMENT = 'https://www.ludus-online.com/';
+// Upstream serves fragment endpoints from a nested path — the bare /displayResults.php form
+// returns 404. Matches the nested-path branch already covered in parser/page-type detection.
+const BASE_FRAGMENT = 'https://www.ludus-online.com/tennis-league/functions/administration/league/';
 
 export const buildInitialSteps = (): WalkStep[] => [
   { kind: 'season-nav', url: BASE_SHELL },
@@ -38,7 +40,9 @@ export const buildDivisionSteps = (seasonName: string, divisions: DivisionDescri
     });
     steps.push({
       kind: 'fixtures-and-results',
-      url: `${BASE_FRAGMENT}displayResults.php?modeID=${d.upstreamModeId}&refreshProtectionCode=0`,
+      // Upstream displayResults.php requires the full JS-equivalent param set —
+      // missing any one returns a PHP-notice page that the parser can't read.
+      url: `${BASE_FRAGMENT}displayResults.php?WebsiteTimeZone=Europe/London&seasonIdentifierID=2&database=ludus3_tl_calderdale&commonDatabase=ludus3_tennis_common&mode=view-division&modeID=${d.upstreamModeId}&daysResultsRequired=7&resultsSecretaryVerificationRequired=N&refreshProtectionCode=0`,
       divisionId: d.divisionId,
       modeId: d.upstreamModeId,
     });

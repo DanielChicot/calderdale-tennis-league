@@ -41,13 +41,14 @@ describe('walk plan', () => {
     }
   });
 
-  it('divisions discovery step uses the league-table URL for the named season', () => {
-    const step = buildDivisionsDiscoveryStep('Summer 2026');
+  it('divisions discovery step carries the seasonId and URL for the named season', () => {
+    const step = buildDivisionsDiscoveryStep('Summer 2026', 42);
     expect(step.kind).toBe('divisions-discovery');
     if (step.kind === 'divisions-discovery') {
       expect(step.url).toContain('navButtonSelect=Summer%202026');
       expect(step.url).toContain('tabIndex=0');
       expect(step.url).toContain('refreshProtectionCode=0');
+      expect(step.seasonId).toBe(42);
     }
   });
 });

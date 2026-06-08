@@ -1,7 +1,7 @@
 export type WalkStep =
   | { kind: 'season-nav'; url: string }
   | { kind: 'clubs-directory'; url: string }
-  | { kind: 'divisions-discovery'; url: string }
+  | { kind: 'divisions-discovery'; url: string; seasonId: number }
   | { kind: 'locations-directory'; url: string }
   | { kind: 'club-contacts'; url: string; teamId: number }
   | { kind: 'club-location'; url: string; clubId: number }
@@ -63,7 +63,8 @@ export const buildMatchCardStep = (fixtureId: number, resultCardUrl: string): Wa
   fixtureId,
 });
 
-export const buildDivisionsDiscoveryStep = (seasonName: string): WalkStep => ({
+export const buildDivisionsDiscoveryStep = (seasonName: string, seasonId: number): WalkStep => ({
   kind: 'divisions-discovery',
   url: `${BASE_SHELL}?navButtonSelect=${encodeURIComponent(seasonName)}&tabIndex=0&refreshProtectionCode=0`,
+  seasonId,
 });

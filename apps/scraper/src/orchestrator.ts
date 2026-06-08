@@ -128,19 +128,9 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         return;
       }
       case 'divisions-discovery': {
-        // INVARIANT: only scheduled from runCurrent, after detectAndPersistSeasons has
-        // set current=true for the desired season. Do NOT schedule from runSeason
-        // or runBackfill — the handler keys off seasons.current=true and would
-        // overwrite divisions for the wrong season.
+        // The seasonId is read directly off the step (set by the caller), so this
+        // handler is now safe to schedule for any season — not just the current one.
         const rows = parseDivisionsDropdown(html);
-        // Pin to the current season — division uniqueness is (slug, season_id) and
-        // (upstream_mode_id, season_id), so a re-run for the same season is idempotent.
-        const [currentSeason] = await db
-          .select({ id: schema.seasons.id })
-          .from(schema.seasons)
-          .where(eq(schema.seasons.current, true))
-          .limit(1);
-        if (!currentSeason) throw new Error('divisions-discovery: no current season set');
         for (const row of rows) {
           await db
             .insert(schema.divisions)
@@ -148,12 +138,19 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
               slug: row.slug,
               name: row.observedName,
               group: row.group,
-              seasonId: currentSeason.id,
+              seasonId: step.seasonId,
               upstreamModeId: row.modeId,
             })
             .onConflictDoUpdate({
-              target: [schema.divisions.slug, schema.divisions.seasonId],
-              set: { name: row.observedName, upstreamModeId: row.modeId, group: row.group },
+              // Use (upstream_mode_id, season_id) as the stable identity — upstream's
+              // modeID rarely changes, but the displayed name (and therefore slug) can.
+              // This prevents orphan rows when upstream renames a division.
+              target: [schema.divisions.upstreamModeId, schema.divisions.seasonId],
+              set: {
+                slug: row.slug,
+                name: row.observedName,
+                group: row.group,
+              },
             });
         }
         return;
@@ -329,7 +326,7 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     r === 'executed' ? report.stepsExecuted++ : r === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
 
     // 2b. discover divisions from the league-table page
-    const discStep = buildDivisionsDiscoveryStep(detection.currentSeasonName);
+    const discStep = buildDivisionsDiscoveryStep(detection.currentSeasonName, detection.currentSeasonId);
     const dr = await runStep(discStep);
     dr === 'executed' ? report.stepsExecuted++ : dr === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
 
@@ -379,9 +376,13 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       parseFailures: 0,
       currentSeasonId: season.id,
     };
-    // NOTE: divisions-discovery is intentionally omitted here — runSeason consumes
-    // divisions already persisted by a prior runCurrent. Adding it would risk
-    // writing rows for the wrong season (see invariant in handleStep above).
+    // Schedule divisions-discovery for this season too — the handler now reads
+    // seasonId off the step, so it's safe to call for any season. This populates
+    // divisions for archive seasons on --season=<slug> backfill walks.
+    const discStep = buildDivisionsDiscoveryStep(season.name, season.id);
+    const dr = await runStep(discStep);
+    dr === 'executed' ? report.stepsExecuted++ : dr === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+
     const divisions = await db
       .select({
         divisionId: schema.divisions.id,

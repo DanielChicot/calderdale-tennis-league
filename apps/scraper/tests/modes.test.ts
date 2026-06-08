@@ -82,6 +82,15 @@ describe('orchestrator modes', () => {
       expect(s.teamId).toBeGreaterThan(0);
     }
 
+    // At least one division must have all 10 standings rows present. Test serves the same
+    // 10-team Mens Div 1 fixture to every division, so subsequent walks fail on the
+    // upstream_team_id partial-unique index — but the first division must succeed cleanly.
+    const firstDivId = divisions[0]!.id;
+    const firstDivStandings = standingsRows.filter((s) => s.divisionId === firstDivId);
+    expect(firstDivStandings).toHaveLength(10);
+    const positions = firstDivStandings.map((s) => s.position).sort((a, b) => a - b);
+    expect(positions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
     const fixtures = await db.select().from(schema.fixtures);
     expect(fixtures.length).toBeGreaterThan(0);
   });

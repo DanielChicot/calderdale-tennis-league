@@ -38,6 +38,8 @@ const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+// Upstream is a read-only renderer (POSTs only switch the rendered division — they
+// don't mutate state), so retrying POST on these transient statuses is safe.
 const RETRIABLE_STATUSES = new Set([502, 503, 504]);
 const BACKOFF_MS = [2_000, 4_000, 8_000];
 
@@ -135,6 +137,8 @@ export const createScrapeHttpClient = (options: ScrapeHttpOptions = {}): ScrapeH
   };
 
   const fetchPagePost = async (url: string, body: string, prior?: PriorFetch): Promise<FetchResult> => {
+    // POST isn't cache-friendly; omit If-Modified-Since and rely solely on content-hash dedup.
+    // (prior.lastModified is intentionally unused here.)
     const headers: Record<string, string> = {
       'User-Agent': userAgent,
       'Content-Type': 'application/x-www-form-urlencoded',

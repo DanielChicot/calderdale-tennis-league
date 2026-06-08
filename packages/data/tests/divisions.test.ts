@@ -10,7 +10,7 @@ describe('divisions getters', () => {
 
   beforeEach(async () => {
     const db = getDb();
-    await db.execute(sql`TRUNCATE seasons, divisions, clubs, teams RESTART IDENTITY CASCADE`);
+    await db.execute(sql`TRUNCATE seasons, divisions, clubs, teams, standings RESTART IDENTITY CASCADE`);
   });
 
   it('listDivisions returns divisions for the season ordered by name', async () => {
@@ -35,14 +35,20 @@ describe('divisions getters', () => {
       slug: 'mens-1', name: 'Mens Division 1', group: 'Mens', seasonId: season!.id, upstreamModeId: 1,
     }).returning();
     const [club] = await db.insert(schema.clubs).values({ slug: 'c', canonicalName: 'C' }).returning();
-    await db.insert(schema.teams).values([
+    const [a, b] = await db.insert(schema.teams).values([
       { slug: 'a-team', name: 'A Team', clubId: club!.id, divisionId: division!.id },
       { slug: 'b-team', name: 'B Team', clubId: club!.id, divisionId: division!.id },
+    ]).returning();
+    await db.insert(schema.standings).values([
+      { teamId: a!.id, divisionId: division!.id, position: 2, resultsReceived: 1, resultsTotal: 5, pointsWon: '3', pointsLost: '2' },
+      { teamId: b!.id, divisionId: division!.id, position: 1, resultsReceived: 2, resultsTotal: 5, pointsWon: '4', pointsLost: '1' },
     ]);
     const result = await getDivisionTable(db, 'mens-1');
     expect(result?.division.slug).toBe('mens-1');
     expect(result?.rows).toHaveLength(2);
+    expect(result?.rows[0]?.teamName).toBe('B Team');
     expect(result?.rows[0]?.position).toBe(1);
+    expect(result?.rows[1]?.teamName).toBe('A Team');
     expect(result?.rows[1]?.position).toBe(2);
   });
 });

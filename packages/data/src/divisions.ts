@@ -48,26 +48,21 @@ export const getDivisionTable = async (db: Database, slug: string): Promise<Divi
     .limit(1);
   if (!division) return null;
 
-  const teams = await db
+  const rows: DivisionTableRow[] = await db
     .select({
-      id: schema.teams.id,
-      slug: schema.teams.slug,
-      name: schema.teams.name,
+      position: schema.standings.position,
+      teamId: schema.teams.id,
+      teamSlug: schema.teams.slug,
+      teamName: schema.teams.name,
+      pointsWon: schema.standings.pointsWon,
+      pointsLost: schema.standings.pointsLost,
+      resultsReceived: schema.standings.resultsReceived,
+      resultsTotal: schema.standings.resultsTotal,
     })
-    .from(schema.teams)
-    .where(eq(schema.teams.divisionId, division.id))
-    .orderBy(schema.teams.name);
-
-  const rows: DivisionTableRow[] = teams.map((t, i) => ({
-    position: i + 1,
-    teamId: t.id,
-    teamSlug: t.slug,
-    teamName: t.name,
-    pointsWon: '0',
-    pointsLost: '0',
-    resultsReceived: 0,
-    resultsTotal: 0,
-  }));
+    .from(schema.standings)
+    .innerJoin(schema.teams, eq(schema.teams.id, schema.standings.teamId))
+    .where(eq(schema.standings.divisionId, division.id))
+    .orderBy(schema.standings.position);
 
   return {
     division: {

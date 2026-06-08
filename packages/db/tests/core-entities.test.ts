@@ -16,7 +16,7 @@ describe('core entities round-trip', () => {
 
   beforeEach(async () => {
     const db = getDb();
-    await db.execute(sql`TRUNCATE seasons, divisions, clubs, club_aliases, teams, players, player_aliases RESTART IDENTITY CASCADE`);
+    await db.execute(sql`TRUNCATE seasons, divisions, clubs, club_aliases, teams, players, player_aliases, standings RESTART IDENTITY CASCADE`);
   });
 
   it('inserts and retrieves a season', async () => {

@@ -103,4 +103,39 @@ describe('createScrapeHttpClient', () => {
     const init = calls[0]?.[1] as RequestInit;
     expect(new Headers(init.headers).get('User-Agent')).toMatch(/CalderdaleLeagueMirror/);
   });
+
+  it('fetchPagePost sends POST with form body and correct headers', async () => {
+    const fakeFetch = vi.fn(async () => makeResponse({ status: 200, body: '<ok/>' }));
+    const client = createScrapeHttpClient({ fetch: fakeFetch as any, rateLimitMs: 0 });
+    await client.fetchPagePost('https://example.test/page', 'a=1&b=2');
+    const calls = fakeFetch.mock.calls as unknown[][];
+    const init = calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('a=1&b=2');
+    expect(new Headers(init.headers).get('Content-Type')).toBe('application/x-www-form-urlencoded');
+  });
+
+  it('fetchPagePost reports unchanged on matching content hash', async () => {
+    const fakeFetch = vi.fn(async () => makeResponse({ status: 200, body: '<same/>' }));
+    const client = createScrapeHttpClient({ fetch: fakeFetch as any, rateLimitMs: 0 });
+    const first = await client.fetchPagePost('https://example.test/page', 'a=1');
+    const hash = first.kind === 'changed' ? first.contentHash : '';
+    const second = await client.fetchPagePost('https://example.test/page', 'a=1', { contentHash: hash });
+    expect(second.kind).toBe('unchanged');
+  });
+
+  it('fetchPagePost retries on 503 then succeeds', async () => {
+    const fakeFetch = vi
+      .fn()
+      .mockResolvedValueOnce(makeResponse({ status: 503 }))
+      .mockResolvedValueOnce(makeResponse({ status: 200, body: '<ok/>' }));
+    const client = createScrapeHttpClient({
+      fetch: fakeFetch as any,
+      rateLimitMs: 0,
+      maxRetries: 2,
+    });
+    const r = await client.fetchPagePost('https://example.test/page', 'a=1');
+    expect(r.kind).toBe('changed');
+    expect(fakeFetch).toHaveBeenCalledTimes(2);
+  });
 });

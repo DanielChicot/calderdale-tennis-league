@@ -31,6 +31,7 @@ export type ScrapeHttpOptions = {
 
 export type ScrapeHttpClient = {
   fetchPage: (url: string, prior?: PriorFetch) => Promise<FetchResult>;
+  fetchPagePost: (url: string, body: string, prior?: PriorFetch) => Promise<FetchResult>;
 };
 
 const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex');
@@ -61,11 +62,15 @@ export const createScrapeHttpClient = (options: ScrapeHttpOptions = {}): ScrapeH
   const requestOnce = async (
     url: string,
     headers: Record<string, string>,
+    method: 'GET' | 'POST' = 'GET',
+    body?: string,
   ): Promise<{ status: number; html: string; headers: Headers }> => {
     const controller = new AbortController();
     const timeout = nativeSetTimeout(() => controller.abort(), requestTimeoutMs);
     try {
-      const res = await f(url, { headers, redirect: 'follow', signal: controller.signal });
+      const init: RequestInit = { method, headers, redirect: 'follow', signal: controller.signal };
+      if (body !== undefined) init.body = body;
+      const res = await f(url, init);
       const text = await res.text();
       return { status: res.status, html: text, headers: res.headers };
     } finally {
@@ -73,30 +78,35 @@ export const createScrapeHttpClient = (options: ScrapeHttpOptions = {}): ScrapeH
     }
   };
 
-  const fetchWithRetries = async (url: string, headers: Record<string, string>) => {
+  const fetchWithRetries = async (
+    url: string,
+    headers: Record<string, string>,
+    method: 'GET' | 'POST' = 'GET',
+    body?: string,
+  ) => {
     let attempt = 0;
     let lastErr: unknown;
     while (attempt <= maxRetries) {
       await respectRateLimit();
       try {
-        const result = await requestOnce(url, headers);
-        if (RETRIABLE_STATUSES.has(result.status) && attempt < maxRetries) {
-          await sleep(BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1]!);
-          attempt++;
-          continue;
+        const res = await requestOnce(url, headers, method, body);
+        if (res.status === 200 || res.status === 304) return res;
+        if (RETRIABLE_STATUSES.has(res.status)) {
+          if (attempt < maxRetries) {
+            await sleep(BACKOFF_MS[attempt]!);
+            attempt++;
+            continue;
+          }
         }
-        if (result.status >= 400 && result.status !== 304) {
-          throw new Error(`fetchPage: ${result.status} for ${url}`);
-        }
-        return result;
+        throw new Error(`fetchPage: ${res.status} for ${url}`);
       } catch (err) {
         lastErr = err;
         if (attempt >= maxRetries) throw err;
-        await sleep(BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1]!);
+        await sleep(BACKOFF_MS[attempt]!);
         attempt++;
       }
     }
-    throw lastErr ?? new Error('fetchWithRetries: unreachable');
+    throw lastErr ?? new Error('fetchWithRetries: exhausted');
   };
 
   const fetchPage = async (url: string, prior?: PriorFetch): Promise<FetchResult> => {
@@ -124,5 +134,18 @@ export const createScrapeHttpClient = (options: ScrapeHttpOptions = {}): ScrapeH
     };
   };
 
-  return { fetchPage };
+  const fetchPagePost = async (url: string, body: string, prior?: PriorFetch): Promise<FetchResult> => {
+    const headers: Record<string, string> = {
+      'User-Agent': userAgent,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+    const res = await fetchWithRetries(url, headers, 'POST', body);
+    const contentHash = sha256(res.html);
+    if (prior?.contentHash && prior.contentHash === contentHash) {
+      return { kind: 'unchanged', status: res.status, contentHash };
+    }
+    return { kind: 'changed', status: res.status, html: res.html, contentHash };
+  };
+
+  return { fetchPage, fetchPagePost };
 };

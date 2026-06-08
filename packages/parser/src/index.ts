@@ -25,3 +25,9 @@ export { parseClubLocation } from './parse-club-location.js';
 export type { ClubLocationRow } from './parse-club-location.js';
 export { parseDivisionsDropdown } from './parse-divisions-dropdown.js';
 export type { DivisionsDropdownRow } from './parse-divisions-dropdown.js';
+export { parseLeagueTableWithTeamIds } from './parse-league-table-with-team-ids.js';
+export type {
+  ParsedLeagueTablePage,
+  StandingsRow,
+  TeamHandlerEntry,
+} from './parse-league-table-with-team-ids.js';

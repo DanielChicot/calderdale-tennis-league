@@ -145,6 +145,10 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
               // Use (upstream_mode_id, season_id) as the stable identity — upstream's
               // modeID rarely changes, but the displayed name (and therefore slug) can.
               // This prevents orphan rows when upstream renames a division.
+              // Edge case: if upstream renames division A to a slug that collides with
+              // an existing different division B in the same season, the slug update
+              // will hit divisions_slug_season_idx and throw. runStep catches and logs
+              // it as a parseFailure — acceptable recovery, very unlikely in practice.
               target: [schema.divisions.upstreamModeId, schema.divisions.seasonId],
               set: {
                 slug: row.slug,

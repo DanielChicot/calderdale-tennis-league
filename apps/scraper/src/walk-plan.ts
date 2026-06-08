@@ -5,7 +5,7 @@ export type WalkStep =
   | { kind: 'locations-directory'; url: string }
   | { kind: 'club-contacts'; url: string; teamId: number }
   | { kind: 'club-location'; url: string; clubId: number }
-  | { kind: 'league-table'; url: string; divisionSlug: string }
+  | { kind: 'league-table-post'; url: string; divisionId: number; modeId: number; postBody: string }
   | { kind: 'fixtures-and-results'; url: string; divisionId: number; modeId: number }
   | { kind: 'player-rankings'; url: string; divisionSlug: string }
   | { kind: 'match-card'; url: string; fixtureId: number };
@@ -34,9 +34,11 @@ export const buildDivisionSteps = (seasonName: string, divisions: DivisionDescri
   const seasonParam = encodeURIComponent(seasonName);
   for (const d of divisions) {
     steps.push({
-      kind: 'league-table',
-      url: `${BASE_SHELL}?navButtonSelect=${seasonParam}&tabIndex=0&refreshProtectionCode=0`,
-      divisionSlug: d.divisionSlug,
+      kind: 'league-table-post',
+      url: `${BASE_SHELL}index.php?navButtonSelect=${seasonParam}&tabIndex=0&refreshProtectionCode=0`,
+      divisionId: d.divisionId,
+      modeId: d.upstreamModeId,
+      postBody: `season_subNav_mode=league&season_subNav_subMode=division&season_subNav_my_division=${d.upstreamModeId}&refreshProtectionCode=0`,
     });
     steps.push({
       kind: 'fixtures-and-results',

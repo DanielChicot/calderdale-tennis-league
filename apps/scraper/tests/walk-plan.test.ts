@@ -7,15 +7,30 @@ describe('walk plan', () => {
     expect(steps.map((s) => s.kind)).toEqual(['season-nav', 'clubs-directory']);
   });
 
-  it('division steps include league-table + fixtures + rankings for each division', () => {
+  it('division steps include league-table-post + fixtures + rankings for each division', () => {
     const steps = buildDivisionSteps('Summer 2026', [
-      { divisionId: 1, divisionSlug: 'mens-1', upstreamModeId: 1 },
-      { divisionId: 2, divisionSlug: 'mens-2', upstreamModeId: 2 },
+      { divisionId: 1, divisionSlug: 'mens-1', upstreamModeId: 8 },
+      { divisionId: 2, divisionSlug: 'mens-2', upstreamModeId: 9 },
     ]);
     expect(steps).toHaveLength(6);
-    expect(steps[0]?.kind).toBe('league-table');
+    expect(steps[0]?.kind).toBe('league-table-post');
     expect(steps[1]?.kind).toBe('fixtures-and-results');
     expect(steps[2]?.kind).toBe('player-rankings');
+    expect(steps[3]?.kind).toBe('league-table-post');
+  });
+
+  it('league-table-post step carries the form body for the division modeID', () => {
+    const steps = buildDivisionSteps('Summer 2026', [
+      { divisionId: 1, divisionSlug: 'mens-1', upstreamModeId: 8 },
+    ]);
+    const lt = steps[0];
+    expect(lt?.kind).toBe('league-table-post');
+    if (lt?.kind === 'league-table-post') {
+      expect(lt.url).toContain('index.php?navButtonSelect=Summer%202026&tabIndex=0');
+      expect(lt.postBody).toBe('season_subNav_mode=league&season_subNav_subMode=division&season_subNav_my_division=8&refreshProtectionCode=0');
+      expect(lt.divisionId).toBe(1);
+      expect(lt.modeId).toBe(8);
+    }
   });
 
   it('match card step references fixture id and url', () => {

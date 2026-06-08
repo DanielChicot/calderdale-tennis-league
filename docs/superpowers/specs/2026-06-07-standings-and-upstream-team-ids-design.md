@@ -97,15 +97,14 @@ The URL points at `index.php` explicitly (the bare `/` form also works but is le
   No change anywhere else — `runKey` is local to `runStep`.
 - New `handleStep` case `'league-table-post'`:
   1. `const parsed = parseLeagueTableWithTeamIds(html);`
-  2. For each `{ teamName, upstreamTeamId } of parsed.teamHandlers`:
-     - `teamId = await resolveTeam(db, teamName, step.divisionId);`
-     - `SELECT upstream_team_id FROM teams WHERE id=teamId`.
-     - If NULL: `UPDATE teams SET upstream_team_id = upstreamTeamId WHERE id = teamId`.
-     - If non-NULL and equal: no-op.
-     - If non-NULL and different: `console.warn` with `teamId/teamName/old/new` and keep the existing value.
+  2. Build a lookup: `const idByName = new Map(parsed.teamHandlers.map((h) => [h.teamName, h.upstreamTeamId]));`
   3. For each `{ position, teamName, ... } of parsed.standings`:
-     - `teamId = await resolveTeam(db, teamName, step.divisionId);` (idempotent — already created above)
-     - `db.insert(standings).values({...}).onConflictDoUpdate({ target: standings.teamId, set: {...} })`.
+     - `teamId = await resolveTeam(db, teamName, step.divisionId);`
+     - `upstreamId = idByName.get(teamName);`
+     - If `upstreamId` is defined: read existing `upstream_team_id`. If NULL → `UPDATE`. If equal → no-op. If different → `console.warn` with `teamId/teamName/old/new` and keep existing.
+     - If `upstreamId` is undefined: `console.warn` that the standings row had no matching contacts entry; do not touch `teams.upstream_team_id`.
+     - Upsert standings: `db.insert(standings).values({ teamId, divisionId: step.divisionId, position, ... }).onConflictDoUpdate({ target: standings.teamId, set: { ... } })`.
+  4. After the loop, if any team handlers had no matching standings row, log them too (parser drift signal).
 
 ### Parser additions
 
@@ -131,15 +130,20 @@ export type ParsedLeagueTablePage = {
 export const parseLeagueTableWithTeamIds = (html: string): ParsedLeagueTablePage;
 ```
 
-Approach (one DOM pass):
-- Select `#leagueTable table.leagueTable_table tbody tr`.
-- For each row:
-  - Read cells (existing `parseLeagueTable` logic — extract this if duplication grows; for now, copy and adjust).
-  - Find the inline `displayContact(this, <ID>)` handler in the row's HTML. We've confirmed every team row has one (`this`, with a numeric arg); the whole-page `displayContact( null, <ID>)` handler lives outside `<tbody>` and isn't matched by the row-scoped search.
-  - If no handler is found in the row, **skip the row entirely** — push nothing to either array. This preserves index parity between the two arrays.
-  - Otherwise push the team name into both arrays — `standings` with the row data, `teamHandlers` with the upstream ID.
+Approach (two independent DOM regions, joined by name):
+- **Standings**: walk `#leagueTable table.leagueTable_table tbody tr` (same as the existing `parseLeagueTable`).
+- **Team handlers**: walk `ul li[onClick*="displayContact"]` inside the contacts list. The text content of each `<li>` is the team name (trim whitespace — observed names include `'Akroydon  '` with trailing spaces). The `onClick` attribute is of the form `displayContact( this, <ID> )` — extract the ID with the regex `/displayContact\(\s*this\s*,\s*(\d+)\s*\)/`.
+- The whole-page `displayContact( null, <ID>)` handler (in a `<script>` outside the contacts list) won't match the selector — it's not on a `<li onClick=…>`. Defence in depth: the regex requires `this`, not `null`.
 
-Index parity is invariant by construction: every row push touches both arrays. `standings.length === teamHandlers.length` is a useful test assertion.
+The two arrays are returned independently:
+```ts
+{ standings: StandingsRow[], teamHandlers: TeamHandlerEntry[] }
+```
+The caller (orchestrator) joins them by team name:
+- Build `Map<teamName, upstreamTeamId>` from `teamHandlers`.
+- For each `standings` row, look up the ID by name and update the team via `resolveTeam` → set `upstream_team_id`.
+
+This is more forgiving than index-parity (a future upstream re-order won't break us) and the rows-vs-handlers count won't always match exactly (the contacts list may have one more entry — e.g. a club secretary contact — or one fewer if a team has no contact filled in).
 
 The existing `parseLeagueTable` stays unchanged for now; deprecation deferred.
 
@@ -180,8 +184,9 @@ Drizzle-side:
 - `parseLeagueTableWithTeamIds` against the new `fixtures/league-table-mens-div-1-post.html`:
   - 10 standings rows; positions `1..10`.
   - Half-point points parse correctly (e.g. `5.5`).
-  - 10 team handlers; each `teamName` matches the standings row at the same index.
-  - Whole-page `displayContact( null, <ID>)` handler is skipped.
+  - 10 team handlers from the contacts list; team names trimmed (handle observed trailing whitespace like `'Akroydon  '`).
+  - Whole-page `displayContact( null, <ID>)` handler is skipped (selector targets `<li onClick=…>`; safety net via `this`-not-`null` regex).
+  - The set of team names from `standings` matches the set from `teamHandlers` for the Mens Div 1 fixture (order-independent set equality).
 - `buildDivisionSteps` updated to emit `'league-table-post'` (replaces existing assertion on `'league-table'`).
 
 **HTTP-client unit tests** (extend `apps/scraper/tests/http-client.test.ts`):

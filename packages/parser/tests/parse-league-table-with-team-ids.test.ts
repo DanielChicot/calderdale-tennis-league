@@ -28,6 +28,19 @@ describe('parseLeagueTableWithTeamIds', () => {
     }
   });
 
+  it('locks in column-order: cells[3]=pointsWon, cells[2]=pointsLost (leader has more wins than losses)', async () => {
+    // The position-1 team should always have more points won than lost — if the
+    // mapping ever flips this test catches it.
+    const html = await loadFixture('league-table-mens-div-1-post.html');
+    const { standings } = parseLeagueTableWithTeamIds(html);
+    const leader = standings[0]!;
+    expect(leader.pointsWon).toBeGreaterThan(leader.pointsLost);
+    // Belt-and-braces: assert the known leader values from the fixture.
+    expect(leader.teamName).toBe('Cragg Vale A');
+    expect(leader.pointsWon).toBe(48);
+    expect(leader.pointsLost).toBe(10);
+  });
+
   it('returns 10 team handlers with numeric upstreamTeamId', async () => {
     const html = await loadFixture('league-table-mens-div-1-post.html');
     const { teamHandlers } = parseLeagueTableWithTeamIds(html);

@@ -48,7 +48,11 @@ describe('divisions getters', () => {
     expect(result?.rows).toHaveLength(2);
     expect(result?.rows[0]?.teamName).toBe('B Team');
     expect(result?.rows[0]?.position).toBe(1);
+    expect(result?.rows[0]?.pointsWon).toBe('4');
+    expect(result?.rows[0]?.pointsLost).toBe('1');
     expect(result?.rows[1]?.teamName).toBe('A Team');
     expect(result?.rows[1]?.position).toBe(2);
+    expect(result?.rows[1]?.pointsWon).toBe('3');
+    expect(result?.rows[1]?.pointsLost).toBe('2');
   });
 });

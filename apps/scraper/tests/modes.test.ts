@@ -29,6 +29,12 @@ describe('orchestrator modes', () => {
     const fixturesAndResults = await fixtureHtml('fixtures-and-results-mens-div-1.html');
 
     const http = {
+      fetchPagePost: vi.fn(async (url: string) => ({
+        kind: 'changed' as const,
+        status: 200,
+        html: '<html></html>',
+        contentHash: `post:${url}`.slice(0, 64),
+      })),
       fetchPage: vi.fn(async (url: string) => {
         if (url === 'https://www.calderdale.tennis-league.org/') {
           return { kind: 'changed' as const, status: 200, html: seasonNav, contentHash: 'home' };

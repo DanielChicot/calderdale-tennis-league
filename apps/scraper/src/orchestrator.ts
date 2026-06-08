@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 import type { Database } from '@ctl/db';
 import { schema } from '@ctl/db';
 import {
@@ -8,7 +9,7 @@ import {
   parseMatchCard,
   parseClubContacts,
   parseClubLocation,
-  parseLeagueTable,
+  parseLeagueTableWithTeamIds,
   parsePlayerRankings,
 } from '@ctl/parser';
 import { createScrapeHttpClient, type ScrapeHttpClient } from './http-client.js';
@@ -38,20 +39,25 @@ export type OrchestratorReport = {
 
 export const createOrchestrator = (db: Database, http: ScrapeHttpClient = createScrapeHttpClient()): Orchestrator => {
   const runStep = async (step: WalkStep): Promise<'executed' | 'skipped' | 'failed'> => {
-    const [prior] = await db.select().from(schema.scrapeRuns).where(eq(schema.scrapeRuns.url, step.url));
+    const runKey = 'postBody' in step
+      ? `${step.url}#bh:${createHash('sha256').update(step.postBody).digest('hex').slice(0, 8)}`
+      : step.url;
+    const [prior] = await db.select().from(schema.scrapeRuns).where(eq(schema.scrapeRuns.url, runKey));
     const priorFetch = prior
       ? {
           ...(prior.lastModified != null ? { lastModified: prior.lastModified } : {}),
           ...(prior.contentHash != null ? { contentHash: prior.contentHash } : {}),
         }
       : undefined;
-    const result = await http.fetchPage(step.url, priorFetch);
+    const result = 'postBody' in step
+      ? await http.fetchPagePost(step.url, step.postBody, priorFetch)
+      : await http.fetchPage(step.url, priorFetch);
 
     if (result.kind === 'unchanged') {
       await db
         .insert(schema.scrapeRuns)
         .values({
-          url: step.url,
+          url: runKey,
           lastFetchedAt: new Date(),
           lastStatus: result.status,
           lastParseOk: true,
@@ -70,7 +76,7 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       await db
         .insert(schema.scrapeRuns)
         .values({
-          url: step.url,
+          url: runKey,
           lastFetchedAt: new Date(),
           lastStatus: result.status,
           lastParseOk: true,
@@ -90,11 +96,11 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         });
       return 'executed';
     } catch (err) {
-      console.error(`[orchestrator] parse failed for ${step.url}:`, err);
+      console.error(`[orchestrator] parse failed for ${runKey}:`, err);
       await db
         .insert(schema.scrapeRuns)
         .values({
-          url: step.url,
+          url: runKey,
           lastFetchedAt: new Date(),
           lastStatus: result.status,
           lastParseOk: false,
@@ -218,9 +224,68 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         // Phase 2 minimum: location columns on clubs table; deferred to follow-up.
         return;
       }
-      case 'league-table': {
-        parseLeagueTable(html);
-        // Upsert team rows into the current division; populate canonical names via aliases.
+      case 'league-table-post': {
+        const parsed = parseLeagueTableWithTeamIds(html);
+        const idByName = new Map(parsed.teamHandlers.map((h) => [h.teamName, h.upstreamTeamId]));
+        const handlerNamesMatchedByStandings = new Set<string>();
+
+        for (const row of parsed.standings) {
+          const teamId = await resolveTeam(db, row.teamName, step.divisionId);
+          const upstreamId = idByName.get(row.teamName);
+          if (upstreamId !== undefined) {
+            handlerNamesMatchedByStandings.add(row.teamName);
+            const [existing] = await db
+              .select({ upstreamTeamId: schema.teams.upstreamTeamId })
+              .from(schema.teams)
+              .where(eq(schema.teams.id, teamId))
+              .limit(1);
+            if (existing?.upstreamTeamId == null) {
+              await db
+                .update(schema.teams)
+                .set({ upstreamTeamId: upstreamId })
+                .where(eq(schema.teams.id, teamId));
+            } else if (existing.upstreamTeamId !== upstreamId) {
+              console.warn(
+                `[orchestrator] upstream_team_id mismatch for team ${teamId} (${row.teamName}): existing=${existing.upstreamTeamId}, observed=${upstreamId}; keeping existing`,
+              );
+            }
+          } else {
+            console.warn(
+              `[orchestrator] standings row "${row.teamName}" has no matching contacts handler in division ${step.divisionId}`,
+            );
+          }
+
+          await db
+            .insert(schema.standings)
+            .values({
+              teamId,
+              divisionId: step.divisionId,
+              position: row.position,
+              resultsReceived: row.resultsReceived,
+              resultsTotal: row.resultsTotal,
+              pointsWon: String(row.pointsWon),
+              pointsLost: String(row.pointsLost),
+            })
+            .onConflictDoUpdate({
+              target: schema.standings.teamId,
+              set: {
+                divisionId: step.divisionId,
+                position: row.position,
+                resultsReceived: row.resultsReceived,
+                resultsTotal: row.resultsTotal,
+                pointsWon: String(row.pointsWon),
+                pointsLost: String(row.pointsLost),
+              },
+            });
+        }
+
+        for (const h of parsed.teamHandlers) {
+          if (!handlerNamesMatchedByStandings.has(h.teamName)) {
+            console.warn(
+              `[orchestrator] contacts handler "${h.teamName}" (upstreamId=${h.upstreamTeamId}) has no matching standings row in division ${step.divisionId}`,
+            );
+          }
+        }
         return;
       }
       case 'player-rankings': {

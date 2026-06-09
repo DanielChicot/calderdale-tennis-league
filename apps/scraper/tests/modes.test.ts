@@ -22,12 +22,13 @@ describe('orchestrator modes', () => {
     );
   });
 
-  it('runCurrent populates seasons, clubs, divisions, teams, fixtures, standings, rankings', async () => {
+  it('runCurrent populates seasons, clubs, divisions, teams, fixtures, standings, rankings, match cards', async () => {
     const seasonNav = await fixtureHtml('season-nav.html');
     const clubsDir = await fixtureHtml('clubs-directory.html');
     const leagueTablePost = await fixtureHtml('league-table-mens-div-1-post.html');
     const fixturesAndResults = await fixtureHtml('fixtures-and-results-mens-div-1.html');
     const playerRankings = await fixtureHtml('player-rankings-mens.html');
+    const matchCard = await fixtureHtml('match-card-sample.html');
 
     const http = {
       fetchPage: vi.fn(async (url: string) => {
@@ -44,6 +45,9 @@ describe('orchestrator modes', () => {
         }
         if (url.includes('displayResults.php')) {
           return { kind: 'changed' as const, status: 200, html: fixturesAndResults, contentHash: `fr:${url}`.slice(0, 64) };
+        }
+        if (url.includes('result_card_')) {
+          return { kind: 'changed' as const, status: 200, html: matchCard, contentHash: `mc:${url}`.slice(0, 64) };
         }
         return { kind: 'changed' as const, status: 200, html: '<html></html>', contentHash: `ot:${url}`.slice(0, 64) };
       }),
@@ -113,6 +117,39 @@ describe('orchestrator modes', () => {
     const divisionGroupById = new Map(divisions.map((d) => [d.id, d.group]));
     const groupsWithRankings = new Set(rankingsRows.map((r) => divisionGroupById.get(r.divisionId)));
     expect(groupsWithRankings).toEqual(new Set(['Mens', 'Ladies', 'Mixed']));
+
+    const cards = await db.select().from(schema.matchCards);
+    expect(cards.length).toBeGreaterThan(0);
+
+    const rubberRows = await db.select().from(schema.rubbers);
+    // Sample card parses to exactly 9 rubbers, each pair 2v2.
+    expect(rubberRows.length).toBe(cards.length * 9);
+    for (const r of rubberRows) {
+      expect(r.homePlayerIds).toHaveLength(2);
+      expect(r.awayPlayerIds).toHaveLength(2);
+    }
+
+    const setRows = await db.select().from(schema.setScores);
+    expect(setRows.length).toBe(cards.length * 9);   // 1 set per rubber in the sample
+    for (const s of setRows) {
+      expect(Number.isInteger(s.homeScore)).toBe(true);
+      expect(Number.isInteger(s.awayScore)).toBe(true);
+    }
+
+    // Self-healing + only-missing: delete one card, re-run, exactly one card refetch.
+    const cardFetches = () =>
+      (http.fetchPage.mock.calls as unknown[][]).filter(
+        (c) => typeof c[0] === 'string' && (c[0] as string).includes('result_card_'),
+      ).length;
+    const fetchesAfterFirstRun = cardFetches();
+    expect(fetchesAfterFirstRun).toBe(cards.length);   // one fetch per missing card
+
+    await db.delete(schema.matchCards).where(eq(schema.matchCards.id, cards[0]!.id));
+    await orch.runCurrent();
+
+    expect(cardFetches()).toBe(fetchesAfterFirstRun + 1);   // only the deleted card refetched
+    const cardsAfter = await db.select().from(schema.matchCards);
+    expect(cardsAfter.length).toBe(cards.length);           // restored
 
     // Spot-check: rank 1 in Mens Division 1 is the fixture's leader.
     const mensDiv1 = divisions.find((d) => d.slug === 'mens-division-1');

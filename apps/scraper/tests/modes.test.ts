@@ -108,6 +108,12 @@ describe('orchestrator modes', () => {
       expect(r.divisionId).toBeGreaterThan(0);
     }
 
+    // Every group's rankings step must have landed rows — a single group clearing
+    // the >=200 floor must not mask the other two groups silently failing.
+    const divisionGroupById = new Map(divisions.map((d) => [d.id, d.group]));
+    const groupsWithRankings = new Set(rankingsRows.map((r) => divisionGroupById.get(r.divisionId)));
+    expect(groupsWithRankings).toEqual(new Set(['Mens', 'Ladies', 'Mixed']));
+
     // Spot-check: rank 1 in Mens Division 1 is the fixture's leader.
     const mensDiv1 = divisions.find((d) => d.slug === 'mens-division-1');
     expect(mensDiv1).toBeDefined();

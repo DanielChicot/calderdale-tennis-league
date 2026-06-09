@@ -81,7 +81,7 @@ export const resolveDivisionName = (
   if (!abbrev) return null;
   const m = /(\d+)$/.exec(abbrev);
   if (!m) return null;
-  return `${group} Division ${m[1]}`;
+  return `${group} Division ${m[1]!}`;
 };
 
 export const resolveTeam = async (

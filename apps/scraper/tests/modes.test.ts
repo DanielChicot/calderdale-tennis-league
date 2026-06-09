@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { startDb, stopDb, getDb } from './setup.js';
 import { createOrchestrator } from '../src/orchestrator.js';
 import { schema } from '@ctl/db';
@@ -22,11 +22,12 @@ describe('orchestrator modes', () => {
     );
   });
 
-  it('runCurrent populates seasons, clubs, divisions, teams, fixtures, standings, upstream_team_id', async () => {
+  it('runCurrent populates seasons, clubs, divisions, teams, fixtures, standings, rankings', async () => {
     const seasonNav = await fixtureHtml('season-nav.html');
     const clubsDir = await fixtureHtml('clubs-directory.html');
     const leagueTablePost = await fixtureHtml('league-table-mens-div-1-post.html');
     const fixturesAndResults = await fixtureHtml('fixtures-and-results-mens-div-1.html');
+    const playerRankings = await fixtureHtml('player-rankings-mens.html');
 
     const http = {
       fetchPage: vi.fn(async (url: string) => {
@@ -49,6 +50,11 @@ describe('orchestrator modes', () => {
       fetchPagePost: vi.fn(async (url: string, body: string) => {
         if (url.includes('index.php') && url.includes('tabIndex=0')) {
           return { kind: 'changed' as const, status: 200, html: leagueTablePost, contentHash: `ltp:${body}`.slice(0, 64) };
+        }
+        if (url.includes('index.php') && url.includes('tabIndex=4')) {
+          // Per-group rankings POSTs — all three groups get the Mens fixture; the
+          // handler maps each group's digits onto that group's real divisions.
+          return { kind: 'changed' as const, status: 200, html: playerRankings, contentHash: `pr:${body}`.slice(0, 64) };
         }
         return { kind: 'changed' as const, status: 200, html: '<html></html>', contentHash: `pst:${url}`.slice(0, 64) };
       }),
@@ -90,6 +96,27 @@ describe('orchestrator modes', () => {
     expect(firstDivStandings).toHaveLength(10);
     const positions = firstDivStandings.map((s) => s.position).sort((a, b) => a - b);
     expect(positions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+    const players = await db.select().from(schema.players);
+    expect(players.length).toBeGreaterThanOrEqual(200);
+
+    const rankingsRows = await db.select().from(schema.rankings);
+    expect(rankingsRows.length).toBeGreaterThanOrEqual(200);
+    for (const r of rankingsRows) {
+      expect(r.rank).toBeGreaterThanOrEqual(1);
+      expect(r.playerId).toBeGreaterThan(0);
+      expect(r.divisionId).toBeGreaterThan(0);
+    }
+
+    // Spot-check: rank 1 in Mens Division 1 is the fixture's leader.
+    const mensDiv1 = divisions.find((d) => d.slug === 'mens-division-1');
+    expect(mensDiv1).toBeDefined();
+    const [top] = await db
+      .select({ name: schema.players.name, rank: schema.rankings.rank })
+      .from(schema.rankings)
+      .innerJoin(schema.players, eq(schema.players.id, schema.rankings.playerId))
+      .where(and(eq(schema.rankings.divisionId, mensDiv1!.id), eq(schema.rankings.rank, 1)));
+    expect(top?.name).toBe('James Hodgson');
 
     const fixtures = await db.select().from(schema.fixtures);
     expect(fixtures.length).toBeGreaterThan(0);

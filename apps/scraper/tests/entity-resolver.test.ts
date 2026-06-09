@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { startDb, stopDb, getDb } from './setup.js';
 import { schema } from '@ctl/db';
-import { resolveClub, resolvePlayer, resolveTeam, stripTeamSuffix } from '../src/entity-resolver.js';
+import { resolveClub, resolvePlayer, resolveTeam, stripTeamSuffix, resolveDivisionName } from '../src/entity-resolver.js';
 
 describe('entity-resolver', () => {
   beforeAll(async () => {
@@ -178,5 +178,28 @@ describe('stripTeamSuffix', () => {
 
   it('ignores trailing lowercase letters (only capital is a suffix marker)', () => {
     expect(stripTeamSuffix('Akroydon a')).toBe('Akroydon a');
+  });
+});
+
+describe('resolveDivisionName', () => {
+  it('maps Mens abbreviations', () => {
+    expect(resolveDivisionName('Mens', 'MD2')).toBe('Mens Division 2');
+    expect(resolveDivisionName('Mens', 'MD4')).toBe('Mens Division 4');
+  });
+
+  it('ignores the abbreviation prefix — Mixed also uses MD', () => {
+    expect(resolveDivisionName('Mixed', 'MD1')).toBe('Mixed Division 1');
+  });
+
+  it('maps Ladies abbreviations', () => {
+    expect(resolveDivisionName('Ladies', 'LD3')).toBe('Ladies Division 3');
+  });
+
+  it('returns null for null abbreviation', () => {
+    expect(resolveDivisionName('Mens', null)).toBeNull();
+  });
+
+  it('returns null when no trailing digit', () => {
+    expect(resolveDivisionName('Mens', 'WeirdLabel')).toBeNull();
   });
 });

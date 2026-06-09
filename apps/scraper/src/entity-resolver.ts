@@ -68,6 +68,22 @@ export const stripTeamSuffix = (observedName: string): string => {
   return match ? match[1]! : observedName;
 };
 
+// Maps a player-rankings abbreviation to the canonical division name.
+//   'Mens'  + 'MD2' → 'Mens Division 2'
+//   'Mixed' + 'MD1' → 'Mixed Division 1'   (Mixed also uses the "MD" prefix upstream —
+//                                           the group from our own POST is authoritative)
+//   'Ladies'+ 'LD3' → 'Ladies Division 3'
+// Returns null when abbrev is null or carries no trailing digit.
+export const resolveDivisionName = (
+  group: 'Mens' | 'Ladies' | 'Mixed',
+  abbrev: string | null,
+): string | null => {
+  if (!abbrev) return null;
+  const m = /(\d+)$/.exec(abbrev);
+  if (!m) return null;
+  return `${group} Division ${m[1]}`;
+};
+
 export const resolveTeam = async (
   db: Database,
   observedName: string,

@@ -1,0 +1,1 @@
+ALTER TABLE "fixtures" ADD COLUMN "upstream_card_id" integer;

@@ -18,6 +18,7 @@ export const fixtures = pgTable(
   {
     id: serial('id').primaryKey(),
     upstreamId: integer('upstream_id'),       // fixture_id from upstream, when known
+    upstreamCardId: integer('upstream_card_id'),   // result_card_N template id, when known
     date: date('date').notNull(),
     homeTeamId: integer('home_team_id').notNull().references(() => teams.id),
     awayTeamId: integer('away_team_id').notNull().references(() => teams.id),

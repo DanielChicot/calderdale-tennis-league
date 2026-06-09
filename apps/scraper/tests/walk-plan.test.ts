@@ -35,11 +35,17 @@ describe('walk plan', () => {
     }
   });
 
-  it('match card step references fixture id and url', () => {
-    const step = buildMatchCardStep(99, 'https://www.ludus-online.com/result_card_3.php?fixture_id=99');
+  it('match card step builds the nested result-card URL with required params', () => {
+    const step = buildMatchCardStep(5, 39, 127);
     expect(step.kind).toBe('match-card');
     if (step.kind === 'match-card') {
-      expect(step.fixtureId).toBe(99);
+      expect(step.fixtureId).toBe(5);
+      expect(step.url).toContain('/tennis-league/functions/results/results_cards/result_card_39.php');
+      expect(step.url).toContain('fixture_id=127');
+      expect(step.url).toContain('WebsiteTimeZone=Europe/London');
+      expect(step.url).toContain('database=ludus3_tl_calderdale');
+      expect(step.url).toContain('commonDatabase=ludus3_tennis_common');
+      expect(step.url).toContain('refreshProtectionCode=0');
     }
   });
 

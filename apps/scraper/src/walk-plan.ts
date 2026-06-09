@@ -52,9 +52,15 @@ export const buildDivisionSteps = (seasonName: string, divisions: DivisionDescri
   return steps;
 };
 
-export const buildMatchCardStep = (fixtureId: number, resultCardUrl: string): WalkStep => ({
+export const buildMatchCardStep = (
+  fixtureId: number,          // our DB fixtures.id — used by the handler
+  cardId: number,             // upstream result_card_N template id (per-division)
+  upstreamFixtureId: number,  // upstream fixture_id — goes in the URL
+): WalkStep => ({
   kind: 'match-card',
-  url: resultCardUrl,
+  // Spike-verified: the bare /result_card_N.php path 404s; the nested path requires
+  // WebsiteTimeZone and both database params or it returns an error/empty stub.
+  url: `https://www.ludus-online.com/tennis-league/functions/results/results_cards/result_card_${cardId}.php?WebsiteTimeZone=Europe/London&fixture_id=${upstreamFixtureId}&database=ludus3_tl_calderdale&commonDatabase=ludus3_tennis_common&refreshProtectionCode=0`,
   fixtureId,
 });
 

@@ -7,7 +7,7 @@ export type WalkStep =
   | { kind: 'club-location'; url: string; clubId: number }
   | { kind: 'league-table-post'; url: string; divisionId: number; modeId: number; postBody: string }
   | { kind: 'fixtures-and-results'; url: string; divisionId: number; modeId: number }
-  | { kind: 'player-rankings'; url: string; divisionSlug: string }
+  | { kind: 'player-rankings-post'; url: string; postBody: string; group: 'Mens' | 'Ladies' | 'Mixed'; seasonId: number }
   | { kind: 'match-card'; url: string; fixtureId: number };
 
 export type DivisionDescriptor = {
@@ -48,11 +48,6 @@ export const buildDivisionSteps = (seasonName: string, divisions: DivisionDescri
       divisionId: d.divisionId,
       modeId: d.upstreamModeId,
     });
-    steps.push({
-      kind: 'player-rankings',
-      url: `${BASE_SHELL}?navButtonSelect=${seasonParam}&tabIndex=4&refreshProtectionCode=0`,
-      divisionSlug: d.divisionSlug,
-    });
   }
   return steps;
 };
@@ -66,5 +61,20 @@ export const buildMatchCardStep = (fixtureId: number, resultCardUrl: string): Wa
 export const buildDivisionsDiscoveryStep = (seasonName: string, seasonId: number): WalkStep => ({
   kind: 'divisions-discovery',
   url: `${BASE_SHELL}?navButtonSelect=${encodeURIComponent(seasonName)}&tabIndex=0&refreshProtectionCode=0`,
+  seasonId,
+});
+
+export const buildPlayerRankingsStep = (
+  seasonName: string,
+  seasonId: number,
+  group: 'Mens' | 'Ladies' | 'Mixed',
+  sampleModeId: number,
+): WalkStep => ({
+  kind: 'player-rankings-post',
+  // tabIndex=4 is the Player Rankings tab. The POST body selects any division in the
+  // target group — the response carries the WHOLE group's leaderboard.
+  url: `${BASE_SHELL}index.php?navButtonSelect=${encodeURIComponent(seasonName)}&tabIndex=4&refreshProtectionCode=0`,
+  postBody: `season_subNav_mode=league&season_subNav_subMode=division&season_subNav_my_division=${sampleModeId}&refreshProtectionCode=0`,
+  group,
   seasonId,
 });

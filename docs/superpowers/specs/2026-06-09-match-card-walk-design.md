@@ -19,6 +19,7 @@ This is bd issue `calderdale-tennis-league-pi8`. Unblocked by `9am` (players are
 | Child-row idempotency | Delete-and-reinsert rubbers (cascading to set_scores) inside one transaction | Cards are small (≤9 rubbers × ≤3 sets); diffing arrays is not worth the complexity. The existing `ON DELETE CASCADE` chain (match_cards → rubbers → set_scores) does the cleanup. |
 | Player resolution | Outside the transaction, via existing `resolvePlayer(name, clubId)`; home pair names resolve against the home team's club, away against the away team's | Same pattern as `resolveTeam`: the resolver has its own internal transaction and is idempotent. The card+rubbers+sets write is the atomic unit. |
 | Failure semantics | A failed card parse logs as `parseFailure`; no `match_cards` row lands; the next run's missing-cards query retries it automatically | Self-healing for free from the fetch strategy. |
+| Retry-vs-dedup interaction | `runStep` only passes `prior` (contentHash / lastModified) to the fetch when the previous parse SUCCEEDED (`scrape_runs.last_parse_ok`) | Without this, a failed parse whose page content hasn't changed returns `'unchanged'` on every retry and the handler never re-runs — the missing-cards query would schedule the fetch forever without ever re-parsing. General fix; benefits all step kinds. |
 
 ## Scope
 

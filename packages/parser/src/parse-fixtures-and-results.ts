@@ -10,8 +10,8 @@ export type FixtureRow = {
   status: FixtureStatus;
   score?: { home: number; away: number };
   fixtureRef?: {
-    id: number;
-    resultCardUrl: string;
+    id: number;       // upstream fixture_id
+    cardId: number;   // N from result_card_N.php — per-division card template id
   };
 };
 
@@ -135,7 +135,7 @@ export const parseFixturesAndResults = (html: string): FixtureRow[] => {
     if (parsed) {
       fixtureRef = {
         id: parsed.fixtureId,
-        resultCardUrl: `https://www.ludus-online.com/result_card_${parsed.cardId}.php?fixture_id=${parsed.fixtureId}`,
+        cardId: parsed.cardId,
       };
     }
 

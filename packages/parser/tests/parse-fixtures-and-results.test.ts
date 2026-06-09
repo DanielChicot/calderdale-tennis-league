@@ -39,7 +39,7 @@ describe('parseFixturesAndResults', () => {
     }
   });
 
-  it('played fixtures expose a fixtureRef (id + result card path)', async () => {
+  it('played fixtures expose a fixtureRef (upstream id + card template id)', async () => {
     const html = await loadFixture('fixtures-and-results-mens-div-1.html');
     const rows = parseFixturesAndResults(html);
     const played = rows.filter((r) => r.status === 'completed');
@@ -48,7 +48,8 @@ describe('parseFixturesAndResults', () => {
       expect(r.fixtureRef).toBeDefined();
       expect(typeof r.fixtureRef?.id).toBe('number');
       expect(r.fixtureRef?.id).toBeGreaterThan(0);
-      expect(r.fixtureRef?.resultCardUrl).toMatch(/^https:\/\/www\.ludus-online\.com\/result_card_\d+\.php\?fixture_id=\d+/);
+      // Mens Div 1 fixtures all share the per-division card template result_card_39.
+      expect(r.fixtureRef?.cardId).toBe(39);
     }
   });
 

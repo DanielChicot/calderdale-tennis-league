@@ -53,4 +53,41 @@ describe('parsePlayerRankings', () => {
     const someDecimal = rows.find((r) => !Number.isInteger(r.rubbersWon));
     expect(someDecimal).toBeDefined();
   });
+
+  it('parses the full Mens group POST fixture (261 rows)', async () => {
+    const html = await loadFixture('player-rankings-mens.html');
+    const rows = parsePlayerRankings(html);
+    expect(rows).toHaveLength(261);
+    expect(rows.every((r, i) => r.rank === i + 1)).toBe(true);
+  });
+
+  it('Mens fixture: primaryDivision spans MD1..MD4 and nothing else', async () => {
+    const html = await loadFixture('player-rankings-mens.html');
+    const rows = parsePlayerRankings(html);
+    const divisions = new Set(rows.map((r) => r.primaryDivision));
+    expect(divisions).toEqual(new Set(['MD1', 'MD2', 'MD3', 'MD4']));
+  });
+
+  it('Mens fixture: locks in the rank-1 row values', async () => {
+    const html = await loadFixture('player-rankings-mens.html');
+    const rows = parsePlayerRankings(html);
+    expect(rows[0]).toEqual({
+      rank: 1,
+      playerName: 'James Hodgson',
+      clubName: 'Akroydon',
+      primaryDivision: 'MD1',
+      rubbersWon: 13,
+      rubbersPlayed: 14,
+      gamesWon: 183,
+      gamesPlayed: 297,
+      rankingScore: 509.7,
+      movement: 'up',
+    });
+  });
+
+  it('Mens fixture: every row has a clubName (no null clubs in this group)', async () => {
+    const html = await loadFixture('player-rankings-mens.html');
+    const rows = parsePlayerRankings(html);
+    expect(rows.every((r) => r.clubName !== null)).toBe(true);
+  });
 });

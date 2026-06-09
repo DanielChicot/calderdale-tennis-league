@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import type { Database } from '@ctl/db';
 import { schema } from '@ctl/db';
@@ -14,12 +14,13 @@ import {
 } from '@ctl/parser';
 import { createScrapeHttpClient, type ScrapeHttpClient } from './http-client.js';
 import { detectAndPersistSeasons } from './season-detector.js';
-import { resolveClub, resolveTeam } from './entity-resolver.js';
+import { resolveClub, resolvePlayer, resolveTeam, resolveDivisionName } from './entity-resolver.js';
 import {
   buildInitialSteps,
   buildDivisionSteps,
   buildDivisionsDiscoveryStep,
   buildMatchCardStep,
+  buildPlayerRankingsStep,
   type WalkStep,
   type DivisionDescriptor,
 } from './walk-plan.js';
@@ -289,9 +290,77 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         }
         return;
       }
-      case 'player-rankings': {
-        parsePlayerRankings(html);
-        // Resolve player and division; upsert ranking row.
+      case 'player-rankings-post': {
+        const rows = parsePlayerRankings(html);
+
+        // Pre-fetch all divisions in this group/season so the per-row lookup is O(1).
+        const divisionsInGroup = await db
+          .select({ id: schema.divisions.id, name: schema.divisions.name })
+          .from(schema.divisions)
+          .where(
+            and(eq(schema.divisions.group, step.group), eq(schema.divisions.seasonId, step.seasonId)),
+          );
+        const divisionByName = new Map(divisionsInGroup.map((d) => [d.name, d.id]));
+
+        let skippedNoDivision = 0;
+        let skippedNoClub = 0;
+
+        for (const row of rows) {
+          const fullName = resolveDivisionName(step.group, row.primaryDivision);
+          if (!fullName) {
+            skippedNoDivision++;
+            continue;
+          }
+          const divisionId = divisionByName.get(fullName);
+          if (divisionId === undefined) {
+            skippedNoDivision++;
+            continue;
+          }
+
+          if (!row.clubName) {
+            skippedNoClub++;
+            continue;
+          }
+          const clubId = await resolveClub(db, row.clubName);
+          const playerId = await resolvePlayer(db, row.playerName, clubId);
+
+          await db
+            .insert(schema.rankings)
+            .values({
+              playerId,
+              divisionId,
+              rank: row.rank,
+              rubbersWon: String(row.rubbersWon),
+              rubbersPlayed: String(row.rubbersPlayed),
+              gamesWon: row.gamesWon,
+              gamesPlayed: row.gamesPlayed,
+              rankingScore: String(row.rankingScore),
+              movement: row.movement,
+            })
+            .onConflictDoUpdate({
+              target: [schema.rankings.playerId, schema.rankings.divisionId],
+              set: {
+                rank: row.rank,
+                rubbersWon: String(row.rubbersWon),
+                rubbersPlayed: String(row.rubbersPlayed),
+                gamesWon: row.gamesWon,
+                gamesPlayed: row.gamesPlayed,
+                rankingScore: String(row.rankingScore),
+                movement: row.movement,
+              },
+            });
+        }
+
+        if (skippedNoDivision > 0) {
+          console.warn(
+            `[orchestrator] player-rankings-post: skipped ${skippedNoDivision} row(s) with unmappable primaryDivision (group=${step.group})`,
+          );
+        }
+        if (skippedNoClub > 0) {
+          console.warn(
+            `[orchestrator] player-rankings-post: skipped ${skippedNoClub} row(s) with null clubName (group=${step.group})`,
+          );
+        }
         return;
       }
       case 'locations-directory':
@@ -355,6 +424,28 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
 
+    // 4. Per-group player rankings — one POST per division group. Each response
+    // carries the whole group's leaderboard, so 3 fetches cover all 9 divisions.
+    const groupReps = await db
+      .select({
+        group: schema.divisions.group,
+        sampleModeId: sql<number>`MIN(${schema.divisions.upstreamModeId})`.as('sample_mode_id'),
+      })
+      .from(schema.divisions)
+      .where(eq(schema.divisions.seasonId, detection.currentSeasonId))
+      .groupBy(schema.divisions.group);
+
+    for (const g of groupReps) {
+      const rankStep = buildPlayerRankingsStep(
+        detection.currentSeasonName,
+        detection.currentSeasonId,
+        g.group,
+        Number(g.sampleModeId),
+      );
+      const outcome = await runStep(rankStep);
+      outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+    }
+
     return report;
   };
 
@@ -407,6 +498,22 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         : outcome === 'skipped'
           ? report.stepsSkipped++
           : report.parseFailures++;
+    }
+
+    // Per-group player rankings — same stage as runCurrent, keyed to this season.
+    const groupReps = await db
+      .select({
+        group: schema.divisions.group,
+        sampleModeId: sql<number>`MIN(${schema.divisions.upstreamModeId})`.as('sample_mode_id'),
+      })
+      .from(schema.divisions)
+      .where(eq(schema.divisions.seasonId, season.id))
+      .groupBy(schema.divisions.group);
+
+    for (const g of groupReps) {
+      const rankStep = buildPlayerRankingsStep(season.name, season.id, g.group, Number(g.sampleModeId));
+      const outcome = await runStep(rankStep);
+      outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
     return report;
   };

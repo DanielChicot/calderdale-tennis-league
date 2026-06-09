@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { aliasedTable, and, eq, inArray, isNotNull, notExists, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import type { Database } from '@ctl/db';
 import { schema } from '@ctl/db';
@@ -44,7 +44,10 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       ? `${step.url}#bh:${createHash('sha256').update(step.postBody).digest('hex').slice(0, 8)}`
       : step.url;
     const [prior] = await db.select().from(schema.scrapeRuns).where(eq(schema.scrapeRuns.url, runKey));
-    const priorFetch = prior
+    // Only dedup against the prior fetch when its parse SUCCEEDED. A failed parse must
+    // re-run the handler even if the page content is unchanged — otherwise the content
+    // hash returns 'unchanged' on every retry and the failure can never self-heal.
+    const priorFetch = prior && prior.lastParseOk
       ? {
           ...(prior.lastModified != null ? { lastModified: prior.lastModified } : {}),
           ...(prior.contentHash != null ? { contentHash: prior.contentHash } : {}),
@@ -179,6 +182,7 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
               .insert(schema.fixtures)
               .values({
                 upstreamId: row.fixtureRef!.id,
+                upstreamCardId: row.fixtureRef!.cardId,
                 date: row.date,
                 homeTeamId,
                 awayTeamId,
@@ -187,7 +191,14 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
               })
               .onConflictDoUpdate({
                 target: schema.fixtures.upstreamId,
-                set: { date: row.date, status: row.status, homeTeamId, awayTeamId, divisionId: step.divisionId },
+                set: {
+                  date: row.date,
+                  status: row.status,
+                  homeTeamId,
+                  awayTeamId,
+                  divisionId: step.divisionId,
+                  upstreamCardId: row.fixtureRef!.cardId,
+                },
               })
               .returning();
             if (row.score) {
@@ -211,9 +222,69 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         return;
       }
       case 'match-card': {
-        parseMatchCard(html);
-        // Upsert match_cards, rubbers, set_scores under the fixtureId
-        // (Implementation depends on player resolution which depends on team resolution.)
+        const { rubbers: parsedRubbers } = parseMatchCard(html);
+
+        // Both sides' clubs in one query — players resolve against their team's club.
+        const homeTeam = aliasedTable(schema.teams, 'home_team');
+        const awayTeam = aliasedTable(schema.teams, 'away_team');
+        const [fx] = await db
+          .select({ homeClubId: homeTeam.clubId, awayClubId: awayTeam.clubId })
+          .from(schema.fixtures)
+          .innerJoin(homeTeam, eq(homeTeam.id, schema.fixtures.homeTeamId))
+          .innerJoin(awayTeam, eq(awayTeam.id, schema.fixtures.awayTeamId))
+          .where(eq(schema.fixtures.id, step.fixtureId));
+        if (!fx) throw new Error(`match-card: fixture ${step.fixtureId} not found`);
+
+        // Resolve players OUTSIDE the tx — resolvePlayer has its own internal
+        // transaction and is idempotent (same pattern as resolveTeam).
+        const resolvedRubbers: Array<{
+          orderInCard: number;
+          homeIds: number[];
+          awayIds: number[];
+          sets: { home: number; away: number }[];
+        }> = [];
+        for (const r of parsedRubbers) {
+          const homeIds: number[] = [];
+          for (const name of r.homePlayerNames) homeIds.push(await resolvePlayer(db, name, fx.homeClubId));
+          const awayIds: number[] = [];
+          for (const name of r.awayPlayerNames) awayIds.push(await resolvePlayer(db, name, fx.awayClubId));
+          resolvedRubbers.push({ orderInCard: r.orderInCard, homeIds, awayIds, sets: r.sets });
+        }
+
+        // Atomic unit: card + children. An EMPTY card still gets a match_cards row —
+        // "fetched, nothing there" — so the missing-cards query doesn't refetch forever.
+        await db.transaction(async (tx) => {
+          const [card] = await tx
+            .insert(schema.matchCards)
+            .values({ fixtureId: step.fixtureId })
+            .onConflictDoUpdate({
+              target: schema.matchCards.fixtureId,
+              set: { fixtureId: step.fixtureId },   // no-op set to make .returning() work on conflict
+            })
+            .returning();
+          // Delete-and-reinsert children (cascades rubbers → set_scores). Cards are
+          // tiny (≤9 rubbers × ≤3 sets); diffing isn't worth the complexity.
+          await tx.delete(schema.rubbers).where(eq(schema.rubbers.matchCardId, card!.id));
+          for (const r of resolvedRubbers) {
+            const [rubber] = await tx
+              .insert(schema.rubbers)
+              .values({
+                matchCardId: card!.id,
+                orderInCard: r.orderInCard,
+                homePlayerIds: r.homeIds,
+                awayPlayerIds: r.awayIds,
+              })
+              .returning();
+            for (const [i, s] of r.sets.entries()) {
+              await tx.insert(schema.setScores).values({
+                rubberId: rubber!.id,
+                orderInRubber: i + 1,
+                homeScore: s.home,
+                awayScore: s.away,
+              });
+            }
+          }
+        });
         return;
       }
       case 'club-contacts': {
@@ -446,6 +517,38 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
 
+    // 5. Match cards — fetch only played fixtures that don't have a card yet.
+    // Failed fetches/parses self-heal: no match_cards row lands, so the fixture
+    // reappears in this query next run (and the runStep retry guard ensures the
+    // handler actually re-runs even when page content is unchanged).
+    const missingCards = await db
+      .select({
+        fixtureId: schema.fixtures.id,
+        upstreamId: schema.fixtures.upstreamId,
+        upstreamCardId: schema.fixtures.upstreamCardId,
+      })
+      .from(schema.fixtures)
+      .innerJoin(schema.divisions, eq(schema.divisions.id, schema.fixtures.divisionId))
+      .where(
+        and(
+          eq(schema.divisions.seasonId, detection.currentSeasonId),
+          inArray(schema.fixtures.status, ['completed', 'rubbers-conceded']),
+          isNotNull(schema.fixtures.upstreamCardId),
+          notExists(
+            db
+              .select()
+              .from(schema.matchCards)
+              .where(eq(schema.matchCards.fixtureId, schema.fixtures.id)),
+          ),
+        ),
+      );
+
+    for (const f of missingCards) {
+      const cardStep = buildMatchCardStep(f.fixtureId, f.upstreamCardId!, f.upstreamId!);
+      const outcome = await runStep(cardStep);
+      outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+    }
+
     return report;
   };
 
@@ -513,6 +616,35 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     for (const g of groupReps) {
       const rankStep = buildPlayerRankingsStep(season.name, season.id, g.group, Number(g.sampleModeId));
       const outcome = await runStep(rankStep);
+      outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+    }
+
+    // Match cards — same stage as runCurrent, keyed to this season.
+    const missingCards = await db
+      .select({
+        fixtureId: schema.fixtures.id,
+        upstreamId: schema.fixtures.upstreamId,
+        upstreamCardId: schema.fixtures.upstreamCardId,
+      })
+      .from(schema.fixtures)
+      .innerJoin(schema.divisions, eq(schema.divisions.id, schema.fixtures.divisionId))
+      .where(
+        and(
+          eq(schema.divisions.seasonId, season.id),
+          inArray(schema.fixtures.status, ['completed', 'rubbers-conceded']),
+          isNotNull(schema.fixtures.upstreamCardId),
+          notExists(
+            db
+              .select()
+              .from(schema.matchCards)
+              .where(eq(schema.matchCards.fixtureId, schema.fixtures.id)),
+          ),
+        ),
+      );
+
+    for (const f of missingCards) {
+      const cardStep = buildMatchCardStep(f.fixtureId, f.upstreamCardId!, f.upstreamId!);
+      const outcome = await runStep(cardStep);
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
     return report;

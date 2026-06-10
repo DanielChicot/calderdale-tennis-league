@@ -63,4 +63,22 @@ describe('parseMatchCard', () => {
       expect(r.awayPlayerNames.length).toBe(2);
     }
   });
+
+  it('skips unplayed sets rendered as empty inputs (two-set rubbers)', async () => {
+    const html = await loadFixture('match-card-two-set-rubbers.html');
+    const { rubbers } = parseMatchCard(html);
+    expect(rubbers.length).toBeGreaterThan(0);
+    // No set may carry NaN or come from an empty input — every parsed set has integer games.
+    for (const r of rubbers) {
+      for (const s of r.sets) {
+        expect(Number.isInteger(s.home)).toBe(true);
+        expect(Number.isInteger(s.away)).toBe(true);
+      }
+    }
+    // Fixture detail: rubber 1v1 went to 3 sets; rubbers 1v2, 2v1, 2v2 finished in 2.
+    const threeSet = rubbers.find((r) => r.sets.length === 3);
+    const twoSet = rubbers.filter((r) => r.sets.length === 2);
+    expect(threeSet).toBeDefined();
+    expect(twoSet.length).toBeGreaterThanOrEqual(3);
+  });
 });

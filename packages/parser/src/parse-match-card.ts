@@ -124,10 +124,16 @@ export const parseMatchCard = (html: string): MatchCardResult => {
       if (!m) return;
 
       const setNum = parseInt(m[1]!, 10);
-      const winnerGames = parseIntStrict($(el).attr('value') ?? '0');
+      const winnerRaw = ($(el).attr('value') ?? '').trim();
 
       const loserInput = $(`#resultsCard_rubber_${code}_set_${setNum}_loser_games`);
-      const loserGames = parseIntStrict(loserInput.attr('value') ?? '0');
+      const loserRaw = (loserInput.attr('value') ?? '').trim();
+
+      // Unplayed sets (e.g. set 3 of a two-set rubber) render as empty inputs — skip them.
+      if (winnerRaw === '' || loserRaw === '') return;
+
+      const winnerGames = parseIntStrict(winnerRaw);
+      const loserGames = parseIntStrict(loserRaw);
 
       // Determine which team won by finding the winner input.
       // It appears after the abandoned checkbox whose id is

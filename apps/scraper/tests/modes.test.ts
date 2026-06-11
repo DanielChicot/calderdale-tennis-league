@@ -18,17 +18,19 @@ describe('orchestrator modes', () => {
   });
   beforeEach(async () => {
     await getDb().execute(
-      sql`TRUNCATE seasons, divisions, clubs, club_aliases, teams, players, player_aliases, fixtures, results, match_cards, rubbers, set_scores, rankings, standings, scrape_runs RESTART IDENTITY CASCADE`,
+      sql`TRUNCATE seasons, divisions, clubs, club_aliases, teams, team_contacts, players, player_aliases, fixtures, results, match_cards, rubbers, set_scores, rankings, standings, scrape_runs RESTART IDENTITY CASCADE`,
     );
   });
 
-  it('runCurrent populates seasons, clubs, divisions, teams, fixtures, standings, rankings, match cards', async () => {
+  it('runCurrent populates seasons, clubs, divisions, teams, fixtures, standings, rankings, match cards, contacts, locations', async () => {
     const seasonNav = await fixtureHtml('season-nav.html');
     const clubsDir = await fixtureHtml('clubs-directory.html');
     const leagueTablePost = await fixtureHtml('league-table-mens-div-1-post.html');
     const fixturesAndResults = await fixtureHtml('fixtures-and-results-mens-div-1.html');
     const playerRankings = await fixtureHtml('player-rankings-mens.html');
     const matchCard = await fixtureHtml('match-card-sample.html');
+    const clubContacts = await fixtureHtml('club-contacts-sample.html');
+    const clubLocation = await fixtureHtml('club-location-sample.html');
 
     const http = {
       fetchPage: vi.fn(async (url: string, prior?: { contentHash?: string }) => {
@@ -55,6 +57,12 @@ describe('orchestrator modes', () => {
             return { kind: 'unchanged' as const, status: 200, contentHash: hash };
           }
           return { kind: 'changed' as const, status: 200, html: matchCard, contentHash: hash };
+        }
+        if (url.includes('displayContacts.php')) {
+          return { kind: 'changed' as const, status: 200, html: clubContacts, contentHash: `cc:${url}`.slice(0, 64) };
+        }
+        if (url.includes('displayLocations.php')) {
+          return { kind: 'changed' as const, status: 200, html: clubLocation, contentHash: `cl:${url}`.slice(0, 64) };
         }
         return { kind: 'changed' as const, status: 200, html: '<html></html>', contentHash: `ot:${url}`.slice(0, 64) };
       }),
@@ -143,6 +151,25 @@ describe('orchestrator modes', () => {
       expect(Number.isInteger(s.awayScore)).toBe(true);
     }
 
+    const clubsWithUpstream = await db
+      .select()
+      .from(schema.clubs)
+      .where(sql`upstream_club_id IS NOT NULL`);
+    expect(clubsWithUpstream.length).toBeGreaterThanOrEqual(15);
+
+    const contactRows = await db.select().from(schema.teamContacts);
+    expect(contactRows.length).toBeGreaterThan(0);
+    for (const c of contactRows) {
+      expect(c.name.length).toBeGreaterThan(0);
+      expect(c.teamId).toBeGreaterThan(0);
+    }
+
+    const clubsWithPostcode = await db
+      .select()
+      .from(schema.clubs)
+      .where(sql`postcode IS NOT NULL`);
+    expect(clubsWithPostcode.length).toBeGreaterThan(0);
+
     // Self-healing + only-missing: delete one card, re-run, exactly one card refetch.
     const cardFetches = () =>
       (http.fetchPage.mock.calls as unknown[][]).filter(
@@ -157,6 +184,9 @@ describe('orchestrator modes', () => {
     expect(cardFetches()).toBe(fetchesAfterFirstRun + 1);   // only the deleted card refetched
     const cardsAfter = await db.select().from(schema.matchCards);
     expect(cardsAfter.length).toBe(cards.length);           // restored
+
+    const contactsAfterSecondRun = await db.select().from(schema.teamContacts);
+    expect(contactsAfterSecondRun.length).toBe(contactRows.length);
 
     // Spot-check: rank 1 in Mens Division 1 is the fixture's leader.
     const mensDiv1 = divisions.find((d) => d.slug === 'mens-division-1');

@@ -185,6 +185,9 @@ describe('orchestrator modes', () => {
     const cardsAfter = await db.select().from(schema.matchCards);
     expect(cardsAfter.length).toBe(cards.length);           // restored
 
+    // Contacts handler idempotency: the mock always returns 'changed' for contacts
+    // URLs, so the handler RAN again on the second runCurrent — if the delete-before-
+    // insert were missing, the count would double here.
     const contactsAfterSecondRun = await db.select().from(schema.teamContacts);
     expect(contactsAfterSecondRun.length).toBe(contactRows.length);
 

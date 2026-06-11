@@ -24,16 +24,38 @@ function ordinal(n: number): string {
 }
 
 /**
+ * Extract one position's player name, handling both upstream markup variants:
+ *  - select variant (editable cards): <select id="resultsCard_{side}_{ord}_pair_{pos}">
+ *    with the chosen player as <option ... selected>.
+ *  - input variant (locked cards): a disabled <input type="text" value="Name">
+ *    immediately preceding <span id="resultsCard_{side}_{ord}_pair_{pos}_error">.
+ */
+function extractPositionName(
+  $: ReturnType<typeof load>,
+  side: 'home' | 'away',
+  ord: string,
+  pos: 'top' | 'bottom',
+): string | undefined {
+  const baseId = `resultsCard_${side}_${ord}_pair_${pos}`;
+
+  const select = $(`select#${baseId}`);
+  if (select.length > 0) {
+    const chosen = select.find('option[selected]').first().text().trim();
+    // Guard against a placeholder being marked selected.
+    if (chosen && !/^select player name/i.test(chosen)) return chosen;
+    return undefined;
+  }
+
+  const input = $(`#${baseId}_error`).prev('input[type="text"]');
+  const val = input.attr('value')?.trim();
+  return val || undefined;
+}
+
+/**
  * Extract the two player names for a given pair.
  *
- * The HTML encodes each pair as:
- *   <input type="text" value="Player Name" disabled />
- *   <span ... id="resultsCard_{side}_{ordinal}_pair_top_error"></span>
- *   ...
- *   <input type="text" value="Player Name" disabled />
- *   <span ... id="resultsCard_{side}_{ordinal}_pair_bottom_error"></span>
- *
- * We find the span by ID and walk back to its preceding-sibling input.
+ * Delegates to extractPositionName which handles both the select variant
+ * (editable cards) and the input variant (locked/completed cards).
  */
 function extractPairNames(
   $: ReturnType<typeof load>,
@@ -41,20 +63,11 @@ function extractPairNames(
   pairIndex: number,
 ): string[] {
   const ord = ordinal(pairIndex);
-  const topSpanId = `resultsCard_${side}_${ord}_pair_top_error`;
-  const bottomSpanId = `resultsCard_${side}_${ord}_pair_bottom_error`;
-
-  const topInput = $(`#${topSpanId}`).prev('input[type="text"]');
-  const bottomInput = $(`#${bottomSpanId}`).prev('input[type="text"]');
-
   const names: string[] = [];
-
-  const topVal = topInput.attr('value')?.trim();
-  if (topVal) names.push(topVal);
-
-  const bottomVal = bottomInput.attr('value')?.trim();
-  if (bottomVal) names.push(bottomVal);
-
+  const top = extractPositionName($, side, ord, 'top');
+  if (top) names.push(top);
+  const bottom = extractPositionName($, side, ord, 'bottom');
+  if (bottom) names.push(bottom);
   return names;
 }
 

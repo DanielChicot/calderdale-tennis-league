@@ -64,6 +64,20 @@ describe('parseMatchCard', () => {
     }
   });
 
+  it('extracts player names from the editable select-variant markup', async () => {
+    const html = await loadFixture('match-card-two-set-rubbers.html');
+    const { rubbers } = parseMatchCard(html);
+    expect(rubbers.length).toBeGreaterThan(0);
+    // Every rubber on this card has both pairs chosen via <option selected>.
+    for (const r of rubbers) {
+      expect(r.homePlayerNames.length).toBeGreaterThan(0);
+      expect(r.awayPlayerNames.length).toBeGreaterThan(0);
+    }
+    // Fixture detail: home 1st-pair top selection is Anise Khalifa.
+    const allHomeNames = rubbers.flatMap((r) => r.homePlayerNames);
+    expect(allHomeNames).toContain('Anise Khalifa');
+  });
+
   it('skips unplayed sets rendered as empty inputs (two-set rubbers)', async () => {
     const html = await loadFixture('match-card-two-set-rubbers.html');
     const { rubbers } = parseMatchCard(html);

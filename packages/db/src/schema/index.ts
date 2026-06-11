@@ -8,3 +8,4 @@ export * from './match-cards.ts';
 export * from './rankings.ts';
 export * from './scrape-runs.ts';
 export * from './standings.ts';
+export * from './team-contacts.ts';

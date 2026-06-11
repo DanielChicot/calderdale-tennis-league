@@ -31,7 +31,7 @@ describe('orchestrator modes', () => {
     const matchCard = await fixtureHtml('match-card-sample.html');
 
     const http = {
-      fetchPage: vi.fn(async (url: string) => {
+      fetchPage: vi.fn(async (url: string, prior?: { contentHash?: string }) => {
         if (url === 'https://www.calderdale.tennis-league.org/') {
           return { kind: 'changed' as const, status: 200, html: seasonNav, contentHash: 'home' };
         }
@@ -47,7 +47,14 @@ describe('orchestrator modes', () => {
           return { kind: 'changed' as const, status: 200, html: fixturesAndResults, contentHash: `fr:${url}`.slice(0, 64) };
         }
         if (url.includes('result_card_')) {
-          return { kind: 'changed' as const, status: 200, html: matchCard, contentHash: `mc:${url}`.slice(0, 64) };
+          const hash = `mc:${url}`.slice(0, 64);
+          // Honour content-hash dedup for card URLs so the e2e exercises the
+          // ignorePrior path: without it, a re-ingested card whose page is
+          // unchanged would return 'unchanged' and never be rewritten.
+          if (prior?.contentHash === hash) {
+            return { kind: 'unchanged' as const, status: 200, contentHash: hash };
+          }
+          return { kind: 'changed' as const, status: 200, html: matchCard, contentHash: hash };
         }
         return { kind: 'changed' as const, status: 200, html: '<html></html>', contentHash: `ot:${url}`.slice(0, 64) };
       }),

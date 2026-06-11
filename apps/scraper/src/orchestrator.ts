@@ -39,7 +39,10 @@ export type OrchestratorReport = {
 };
 
 export const createOrchestrator = (db: Database, http: ScrapeHttpClient = createScrapeHttpClient()): Orchestrator => {
-  const runStep = async (step: WalkStep): Promise<'executed' | 'skipped' | 'failed'> => {
+  const runStep = async (
+    step: WalkStep,
+    opts: { ignorePrior?: boolean } = {},
+  ): Promise<'executed' | 'skipped' | 'failed'> => {
     const runKey = 'postBody' in step
       ? `${step.url}#bh:${createHash('sha256').update(step.postBody).digest('hex').slice(0, 8)}`
       : step.url;
@@ -47,7 +50,10 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     // Only dedup against the prior fetch when its parse SUCCEEDED. A failed parse must
     // re-run the handler even if the page content is unchanged — otherwise the content
     // hash returns 'unchanged' on every retry and the failure can never self-heal.
-    const priorFetch = prior && prior.lastParseOk
+    // Callers can also opt out entirely (ignorePrior) when they know the DB state is
+    // missing regardless of page content — e.g. the missing-cards stage re-ingesting
+    // after a truncate: the page is unchanged but the rows must be rewritten.
+    const priorFetch = prior && prior.lastParseOk && !opts.ignorePrior
       ? {
           ...(prior.lastModified != null ? { lastModified: prior.lastModified } : {}),
           ...(prior.contentHash != null ? { contentHash: prior.contentHash } : {}),
@@ -545,7 +551,7 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
 
     for (const f of missingCards) {
       const cardStep = buildMatchCardStep(f.fixtureId, f.upstreamCardId!, f.upstreamId!);
-      const outcome = await runStep(cardStep);
+      const outcome = await runStep(cardStep, { ignorePrior: true });
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
 
@@ -644,7 +650,7 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
 
     for (const f of missingCards) {
       const cardStep = buildMatchCardStep(f.fixtureId, f.upstreamCardId!, f.upstreamId!);
-      const outcome = await runStep(cardStep);
+      const outcome = await runStep(cardStep, { ignorePrior: true });
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
     return report;

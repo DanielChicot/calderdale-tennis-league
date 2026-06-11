@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildInitialSteps, buildDivisionSteps, buildMatchCardStep, buildDivisionsDiscoveryStep, buildPlayerRankingsStep } from '../src/walk-plan.js';
+import { buildInitialSteps, buildDivisionSteps, buildMatchCardStep, buildDivisionsDiscoveryStep, buildPlayerRankingsStep, buildClubContactsStep, buildClubLocationStep } from '../src/walk-plan.js';
 
 describe('walk plan', () => {
   it('initial steps include season-nav and clubs-directory in order', () => {
@@ -68,6 +68,33 @@ describe('walk plan', () => {
       expect(step.postBody).toBe('season_subNav_mode=league&season_subNav_subMode=division&season_subNav_my_division=8&refreshProtectionCode=0');
       expect(step.group).toBe('Mens');
       expect(step.seasonId).toBe(7);
+    }
+  });
+
+  it('club contacts step builds the season-fragment URL with required params', () => {
+    const step = buildClubContactsStep(7, 40);
+    expect(step.kind).toBe('club-contacts');
+    if (step.kind === 'club-contacts') {
+      expect(step.teamId).toBe(7);
+      expect(step.url).toContain('/tennis-league/functions/season/displayContacts.php');
+      expect(step.url).toContain('Mode=team');
+      expect(step.url).toContain('teamID=40');
+      expect(step.url).toContain('WebsiteTimeZone=Europe/London');
+      expect(step.url).toContain('database=ludus3_tl_calderdale');
+      expect(step.url).toContain('user_privacy=public');
+    }
+  });
+
+  it('club location step builds the season-fragment URL with required params', () => {
+    const step = buildClubLocationStep(3, 16);
+    expect(step.kind).toBe('club-location');
+    if (step.kind === 'club-location') {
+      expect(step.clubId).toBe(3);
+      expect(step.url).toContain('/tennis-league/functions/season/displayLocations.php');
+      expect(step.url).toContain('Mode=html');
+      expect(step.url).toContain('locationID=0');
+      expect(step.url).toContain('clubID=16');
+      expect(step.url).toContain('commonDatabase=ludus3_tennis_common');
     }
   });
 });

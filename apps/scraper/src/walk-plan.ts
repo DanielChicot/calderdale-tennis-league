@@ -70,6 +70,27 @@ export const buildDivisionsDiscoveryStep = (seasonName: string, seasonId: number
   seasonId,
 });
 
+const SEASON_FRAGMENT = 'https://www.ludus-online.com/tennis-league/functions/season/';
+
+export const buildClubContactsStep = (
+  teamId: number,            // our DB teams.id — used by the handler
+  upstreamTeamId: number,    // upstream team id — goes in the URL
+): WalkStep => ({
+  kind: 'club-contacts',
+  url: `${SEASON_FRAGMENT}displayContacts.php?WebsiteTimeZone=Europe/London&database=ludus3_tl_calderdale&commonDatabase=ludus3_tennis_common&Mode=team&teamID=${upstreamTeamId}&refreshProtectionCode=0&user_privacy=public`,
+  teamId,
+});
+
+export const buildClubLocationStep = (
+  clubId: number,            // our DB clubs.id — used by the handler
+  upstreamClubId: number,    // upstream club id — goes in the URL
+): WalkStep => ({
+  kind: 'club-location',
+  // locationID=0 selects the club's venue; Mode=html returns the address fragment.
+  url: `${SEASON_FRAGMENT}displayLocations.php?Mode=html&WebsiteTimeZone=Europe/London&database=ludus3_tl_calderdale&commonDatabase=ludus3_tennis_common&locationID=0&clubID=${upstreamClubId}&refreshProtectionCode=0&user_privacy=public`,
+  clubId,
+});
+
 export const buildPlayerRankingsStep = (
   seasonName: string,
   seasonId: number,

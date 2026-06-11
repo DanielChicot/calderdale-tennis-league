@@ -4,6 +4,7 @@ import type { Database } from '@ctl/db';
 import { schema } from '@ctl/db';
 import {
   parseClubsDirectory,
+  parseClubsDropdown,
   parseDivisionsDropdown,
   parseFixturesAndResults,
   parseMatchCard,
@@ -21,6 +22,8 @@ import {
   buildDivisionsDiscoveryStep,
   buildMatchCardStep,
   buildPlayerRankingsStep,
+  buildClubContactsStep,
+  buildClubLocationStep,
   type WalkStep,
   type DivisionDescriptor,
 } from './walk-plan.js';
@@ -294,13 +297,34 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
         return;
       }
       case 'club-contacts': {
-        parseClubContacts(html);
-        // Phase 2 minimum: contacts stored alongside teams; deferred to follow-up.
+        const contacts = parseClubContacts(html);
+        // Snapshot per team: the upstream page is the source of truth, so a successful
+        // fetch replaces whatever we had — including replacing with nothing.
+        await db.transaction(async (tx) => {
+          await tx.delete(schema.teamContacts).where(eq(schema.teamContacts.teamId, step.teamId));
+          for (const c of contacts) {
+            await tx.insert(schema.teamContacts).values({
+              teamId: step.teamId,
+              name: c.name,
+              role: c.role ?? null,
+              phone: c.phone ?? null,
+              email: c.email ?? null,
+            });
+          }
+        });
         return;
       }
       case 'club-location': {
-        parseClubLocation(html);
-        // Phase 2 minimum: location columns on clubs table; deferred to follow-up.
+        const loc = parseClubLocation(html);
+        await db
+          .update(schema.clubs)
+          .set({
+            address: loc.address ?? null,
+            postcode: loc.postcode ?? null,
+            lat: loc.lat != null ? String(loc.lat) : null,
+            lng: loc.lng != null ? String(loc.lng) : null,
+          })
+          .where(eq(schema.clubs.id, step.clubId));
         return;
       }
       case 'league-table-post': {
@@ -362,6 +386,29 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
           if (!handlerNamesMatchedByStandings.has(h.teamName)) {
             console.warn(
               `[orchestrator] contacts handler "${h.teamName}" (upstreamId=${h.upstreamTeamId}) has no matching standings row in division ${step.divisionId}`,
+            );
+          }
+        }
+
+        // The page also carries the league-wide "My Club" dropdown with upstream club
+        // ids. Capture them here (NULL-only set, warn-on-mismatch — same policy as
+        // upstream_team_id). Identical on every division's page, so re-parses no-op.
+        const clubEntries = parseClubsDropdown(html);
+        for (const entry of clubEntries) {
+          const clubId = await resolveClub(db, entry.observedName);
+          const [existingClub] = await db
+            .select({ upstreamClubId: schema.clubs.upstreamClubId })
+            .from(schema.clubs)
+            .where(eq(schema.clubs.id, clubId))
+            .limit(1);
+          if (existingClub?.upstreamClubId == null) {
+            await db
+              .update(schema.clubs)
+              .set({ upstreamClubId: entry.upstreamClubId })
+              .where(eq(schema.clubs.id, clubId));
+          } else if (existingClub.upstreamClubId !== entry.upstreamClubId) {
+            console.warn(
+              `[orchestrator] upstream_club_id mismatch for club ${clubId} (${entry.observedName}): existing=${existingClub.upstreamClubId}, observed=${entry.upstreamClubId}; keeping existing`,
             );
           }
         }
@@ -555,6 +602,28 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
 
+    // 6. Contacts + locations — every run. Contacts change mid-season (new captain);
+    // content-hash dedup means unchanged pages skip the handlers, so re-runs cost
+    // only the fetch pacing.
+    const contactTeams = await db
+      .select({ teamId: schema.teams.id, upstreamTeamId: schema.teams.upstreamTeamId })
+      .from(schema.teams)
+      .innerJoin(schema.divisions, eq(schema.divisions.id, schema.teams.divisionId))
+      .where(and(eq(schema.divisions.seasonId, detection.currentSeasonId), isNotNull(schema.teams.upstreamTeamId)));
+    for (const t of contactTeams) {
+      const outcome = await runStep(buildClubContactsStep(t.teamId, t.upstreamTeamId!));
+      outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+    }
+
+    const locationClubs = await db
+      .select({ clubId: schema.clubs.id, upstreamClubId: schema.clubs.upstreamClubId })
+      .from(schema.clubs)
+      .where(isNotNull(schema.clubs.upstreamClubId));
+    for (const c of locationClubs) {
+      const outcome = await runStep(buildClubLocationStep(c.clubId, c.upstreamClubId!));
+      outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+    }
+
     return report;
   };
 
@@ -651,6 +720,26 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     for (const f of missingCards) {
       const cardStep = buildMatchCardStep(f.fixtureId, f.upstreamCardId!, f.upstreamId!);
       const outcome = await runStep(cardStep, { ignorePrior: true });
+      outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+    }
+
+    // Contacts + locations — same stage as runCurrent, keyed to this season's teams.
+    const contactTeams = await db
+      .select({ teamId: schema.teams.id, upstreamTeamId: schema.teams.upstreamTeamId })
+      .from(schema.teams)
+      .innerJoin(schema.divisions, eq(schema.divisions.id, schema.teams.divisionId))
+      .where(and(eq(schema.divisions.seasonId, season.id), isNotNull(schema.teams.upstreamTeamId)));
+    for (const t of contactTeams) {
+      const outcome = await runStep(buildClubContactsStep(t.teamId, t.upstreamTeamId!));
+      outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
+    }
+
+    const locationClubs = await db
+      .select({ clubId: schema.clubs.id, upstreamClubId: schema.clubs.upstreamClubId })
+      .from(schema.clubs)
+      .where(isNotNull(schema.clubs.upstreamClubId));
+    for (const c of locationClubs) {
+      const outcome = await runStep(buildClubLocationStep(c.clubId, c.upstreamClubId!));
       outcome === 'executed' ? report.stepsExecuted++ : outcome === 'skipped' ? report.stepsSkipped++ : report.parseFailures++;
     }
     return report;

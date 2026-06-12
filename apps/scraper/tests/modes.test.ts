@@ -204,4 +204,29 @@ describe('orchestrator modes', () => {
     const fixtures = await db.select().from(schema.fixtures);
     expect(fixtures.length).toBeGreaterThan(0);
   });
+
+  it('runBackfill fetches the home page exactly once', async () => {
+    const seasonNav = await fixtureHtml('season-nav.html');
+    const HOME = 'https://www.calderdale.tennis-league.org/';
+    const http = {
+      fetchPage: vi.fn(async (url: string) => {
+        if (url === HOME) {
+          return { kind: 'changed' as const, status: 200, html: seasonNav, contentHash: 'home' };
+        }
+        return { kind: 'changed' as const, status: 200, html: '<html></html>', contentHash: `x:${url}`.slice(0, 64) };
+      }),
+      fetchPagePost: vi.fn(async (url: string) => ({
+        kind: 'changed' as const,
+        status: 200,
+        html: '<html></html>',
+        contentHash: `p:${url}`.slice(0, 64),
+      })),
+    };
+    const orch = createOrchestrator(getDb(), http);
+    const reports = await orch.runBackfill();
+    expect(reports.length).toBeGreaterThanOrEqual(1);   // season-nav fixture yields ≥1 season
+
+    const homeFetches = (http.fetchPage.mock.calls as unknown[][]).filter((c) => c[0] === HOME).length;
+    expect(homeFetches).toBe(1);
+  });
 });

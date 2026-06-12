@@ -627,21 +627,17 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     return report;
   };
 
-  const runSeason = async (seasonSlug: string): Promise<OrchestratorReport> => {
-    // Fetch home, detect + persist seasons
+  // Shared prologue for runSeason/runBackfill: one full-body home fetch + season
+  // detection. (runCurrent keeps its own prior-aware variant — it also needs the
+  // detection result, and benefits from conditional-fetch bookkeeping.)
+  const detectSeasonsFromHome = async (): Promise<void> => {
     const homeStep = buildInitialSteps()[0]!;
     const homeResult = await http.fetchPage(homeStep.url);
-    if (homeResult.kind !== 'changed') throw new Error('runSeason: cannot acquire home page');
+    if (homeResult.kind !== 'changed') throw new Error('orchestrator: cannot acquire home page');
     await detectAndPersistSeasons(db, homeResult.html);
+  };
 
-    // Look up named season
-    const [season] = await db
-      .select()
-      .from(schema.seasons)
-      .where(eq(schema.seasons.slug, seasonSlug))
-      .limit(1);
-    if (!season) throw new Error(`runSeason: unknown season slug ${seasonSlug}`);
-
+  const walkSeason = async (season: { id: number; name: string }): Promise<OrchestratorReport> => {
     // Walk division steps for that season
     const report: OrchestratorReport = {
       stepsExecuted: 0,
@@ -745,19 +741,26 @@ export const createOrchestrator = (db: Database, http: ScrapeHttpClient = create
     return report;
   };
 
-  const runBackfill = async (): Promise<OrchestratorReport[]> => {
-    // Fetch home, persist seasons
-    const homeStep = buildInitialSteps()[0]!;
-    const homeResult = await http.fetchPage(homeStep.url);
-    if (homeResult.kind !== 'changed') throw new Error('runBackfill: cannot acquire home page');
-    await detectAndPersistSeasons(db, homeResult.html);
+  const runSeason = async (seasonSlug: string): Promise<OrchestratorReport> => {
+    await detectSeasonsFromHome();
+    const [season] = await db
+      .select()
+      .from(schema.seasons)
+      .where(eq(schema.seasons.slug, seasonSlug))
+      .limit(1);
+    if (!season) throw new Error(`runSeason: unknown season slug ${seasonSlug}`);
+    return walkSeason(season);
+  };
 
-    // Then run runSeason for every season in the DB
-    const allSeasons = await db.select({ slug: schema.seasons.slug }).from(schema.seasons);
+  const runBackfill = async (): Promise<OrchestratorReport[]> => {
+    // One home fetch for the whole backfill — walkSeason does not re-detect.
+    await detectSeasonsFromHome();
+    const allSeasons = await db
+      .select({ id: schema.seasons.id, name: schema.seasons.name })
+      .from(schema.seasons);
     const reports: OrchestratorReport[] = [];
     for (const s of allSeasons) {
-      const report = await runSeason(s.slug);
-      reports.push(report);
+      reports.push(await walkSeason(s));
     }
     return reports;
   };

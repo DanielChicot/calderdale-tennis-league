@@ -28,7 +28,14 @@ export const parseLeagueTableWithTeamIds = (html: string): ParsedLeagueTablePage
   $('#leagueTable table.leagueTable_table tbody tr').each((_, el) => {
     const cells = $(el)
       .find('td')
-      .map((__, td) => $(td).text().trim())
+      .map((__, td) => {
+        // The league table appends superscript footnote markers to adjusted
+        // points (e.g. "41<sup>1</sup>" for 41 points with footnote 1). A naive
+        // .text() concatenates them into "411", so strip <sup>/<sub> first.
+        const $td = $(td).clone();
+        $td.find('sup, sub').remove();
+        return $td.text().trim();
+      })
       .get();
     if (cells.length < 4) return;
     const teamName = cells[0]!;

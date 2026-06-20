@@ -78,4 +78,24 @@ describe('parseLeagueTableWithTeamIds', () => {
     const { teamHandlers } = parseLeagueTableWithTeamIds(html);
     expect(teamHandlers).toEqual([{ teamName: 'Cragg Vale A', upstreamTeamId: 40 }]);
   });
+
+  it('strips superscript footnote markers from points (41<sup>1</sup> → 41, not 411)', () => {
+    // The live league table appends <sup> footnote markers to adjusted points;
+    // a naive .text() would read "411" / "29.52" instead of 41 / 29.5.
+    const html = `
+      <html><body>
+        <div id="leagueTable"><table class="leagueTable_table">
+          <thead><tr></tr></thead>
+          <tbody>
+            <tr><td>Mirfield A</td><td>9/18</td><td>39</td><td>41<sup>1</sup></td><td></td></tr>
+            <tr><td>Park A</td><td>9/18</td><td>46.5</td><td>29.5<sup>2</sup></td><td></td></tr>
+          </tbody>
+        </table></div>
+      </body></html>
+    `;
+    const { standings } = parseLeagueTableWithTeamIds(html);
+    expect(standings).toHaveLength(2);
+    expect(standings[0]?.pointsWon).toBe(41);
+    expect(standings[1]?.pointsWon).toBe(29.5);
+  });
 });

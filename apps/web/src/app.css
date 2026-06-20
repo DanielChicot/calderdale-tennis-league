@@ -23,6 +23,8 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--border); }
 th { font-size: 11px; text-transform: uppercase; color: var(--muted); border-top: none; }
 td.num, th.num { text-align: right; }
+/* Tabular (fixed-width) figures so right-aligned numeric columns line up cleanly. */
+td.figs { font-variant-numeric: tabular-nums; }
 .tabs { display: flex; border-bottom: 2px solid var(--green); margin-top: 12px; }
 .tabs button { flex: 1; padding: 8px; background: var(--green-light); border: none; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
 .tabs button.active { color: var(--green); border-bottom: 3px solid var(--green); background: #fff; }
@@ -34,3 +36,16 @@ td.num, th.num { text-align: right; }
 .rubber { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; font-size: 14px; }
 .rubber .vs { color: var(--muted); font-size: 12px; margin: 2px 0; }
 .score { font-weight: 700; }
+
+/* Fixtures/results grid: home right-aligned, score centred, away left-aligned. */
+table.fixtures { margin-top: 8px; }
+table.fixtures td { vertical-align: middle; }
+table.fixtures td.date { white-space: nowrap; font-size: 13px; width: 1%; }
+table.fixtures td.home { text-align: right; }
+table.fixtures td.away { text-align: left; }
+table.fixtures td.result { text-align: center; white-space: nowrap; width: 1%; padding: 6px 4px; }
+table.fixtures td.result .score {
+  display: inline-block; min-width: 56px; padding: 2px 8px; border-radius: 6px;
+  background: var(--green-light); color: var(--green); font-variant-numeric: tabular-nums;
+}
+table.fixtures td.card { text-align: right; white-space: nowrap; width: 1%; font-size: 13px; }

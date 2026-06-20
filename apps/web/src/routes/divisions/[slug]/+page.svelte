@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatDate } from '$lib/format';
+  import { formatDate, formatScore } from '$lib/format';
   let { data } = $props();
   let tab = $state<'standings' | 'fixtures' | 'rankings'>('standings');
 </script>
@@ -23,31 +23,35 @@
         <tr>
           <td>{row.position}</td>
           <td><a href="/teams/{row.teamSlug}">{row.teamName}</a></td>
-          <td class="num">{row.resultsReceived}/{row.resultsTotal}</td>
-          <td class="num">{row.pointsWon}</td>
-          <td class="num">{row.pointsLost}</td>
+          <td class="num figs">{row.resultsReceived}/{row.resultsTotal}</td>
+          <td class="num figs">{row.pointsWon}</td>
+          <td class="num figs">{row.pointsLost}</td>
         </tr>
       {/each}
     </tbody>
   </table>
 {:else if tab === 'fixtures'}
-  {#each data.fixtures as f (f.id)}
-    <div class="list-row">
-      <span>
-        <span class="muted">{formatDate(f.date)}</span>
-        <a href="/teams/{f.homeTeam.slug}">{f.homeTeam.name}</a>
-        {#if f.score}<span class="score"> {f.score.home}–{f.score.away} </span>{:else}<span class="muted"> v </span>{/if}
-        <a href="/teams/{f.awayTeam.slug}">{f.awayTeam.name}</a>
-      </span>
-      {#if f.hasCard}<a href="/matches/{f.id}">card →</a>{/if}
-    </div>
-  {/each}
+  <table class="fixtures">
+    <tbody>
+      {#each data.fixtures as f (f.id)}
+        <tr>
+          <td class="muted date">{formatDate(f.date)}</td>
+          <td class="home"><a href="/teams/{f.homeTeam.slug}">{f.homeTeam.name}</a></td>
+          <td class="result">
+            {#if f.score}<span class="score">{f.score.home}–{f.score.away}</span>{:else}<span class="muted">v</span>{/if}
+          </td>
+          <td class="away"><a href="/teams/{f.awayTeam.slug}">{f.awayTeam.name}</a></td>
+          <td class="card">{#if f.hasCard}<a href="/matches/{f.id}">card →</a>{/if}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
 {:else}
   <table>
     <thead><tr><th>#</th><th>Player</th><th class="num">Score</th></tr></thead>
     <tbody>
       {#each data.rankings as r (r.playerId)}
-        <tr><td>{r.rank}</td><td>{r.playerName}</td><td class="num">{r.rankingScore}</td></tr>
+        <tr><td>{r.rank}</td><td>{r.playerName}</td><td class="num figs">{formatScore(r.rankingScore)}</td></tr>
       {/each}
     </tbody>
   </table>

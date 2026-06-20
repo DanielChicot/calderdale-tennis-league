@@ -12,6 +12,14 @@ export const formatDate = (iso: string): string => {
   return `${weekday} ${day} ${month} ${year}`;
 };
 
+// Format a numeric score string (drizzle returns numeric columns as strings) to a
+// fixed 2 decimal places so columns line up — e.g. "509.7" → "509.70". Returns the
+// input unchanged if it isn't a number.
+export const formatScore = (value: string): string => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : value;
+};
+
 // Group divisions by their group label, preserving Mens → Ladies → Mixed order.
 export type Grouped<T> = { group: 'Mens' | 'Ladies' | 'Mixed'; items: T[] }[];
 export const groupByDivisionGroup = <T extends { group: 'Mens' | 'Ladies' | 'Mixed' }>(items: T[]): Grouped<T> => {

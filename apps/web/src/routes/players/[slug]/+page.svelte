@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatDate } from '$lib/format';
+  import { formatDate, formatScore } from '$lib/format';
   let { data } = $props();
   const p = $derived(data.profile);
 </script>
@@ -17,7 +17,7 @@
         <tr>
           <td><a href="/divisions/{r.division.slug}">{r.division.name}</a></td>
           <td class="num">{r.rank}</td>
-          <td class="num">{r.rankingScore}</td>
+          <td class="num figs">{formatScore(r.rankingScore)}</td>
         </tr>
       {/each}
     </tbody>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDate, groupByDivisionGroup } from './format.js';
+import { formatDate, formatScore, groupByDivisionGroup } from './format.js';
 
 describe('formatDate', () => {
   it('formats an ISO date as a UK day-month-year string', () => {
@@ -7,6 +7,17 @@ describe('formatDate', () => {
   });
   it('returns the input unchanged when not a date', () => {
     expect(formatDate('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('formatScore', () => {
+  it('pads to 2 decimal places', () => {
+    expect(formatScore('509.7')).toBe('509.70');
+    expect(formatScore('537.26')).toBe('537.26');
+    expect(formatScore('48')).toBe('48.00');
+  });
+  it('returns the input unchanged when not a number', () => {
+    expect(formatScore('n/a')).toBe('n/a');
   });
 });
 

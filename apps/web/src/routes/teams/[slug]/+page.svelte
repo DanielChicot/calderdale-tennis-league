@@ -21,17 +21,21 @@
 {/if}
 
 <h2>Fixtures & Results</h2>
-{#each t.fixtures as f (f.id)}
-  <div class="list-row">
-    <span>
-      <span class="muted">{formatDate(f.date)}</span>
-      <a href="/teams/{f.homeTeam.slug}">{f.homeTeam.name}</a>
-      {#if f.score}<span class="score"> {f.score.home}–{f.score.away} </span>{:else}<span class="muted"> v </span>{/if}
-      <a href="/teams/{f.awayTeam.slug}">{f.awayTeam.name}</a>
-    </span>
-    {#if f.hasCard}<a href="/matches/{f.id}">card →</a>{/if}
-  </div>
-{/each}
+<table class="fixtures">
+  <tbody>
+    {#each t.fixtures as f (f.id)}
+      <tr>
+        <td class="muted date">{formatDate(f.date)}</td>
+        <td class="home"><a href="/teams/{f.homeTeam.slug}">{f.homeTeam.name}</a></td>
+        <td class="result">
+          {#if f.score}<span class="score">{f.score.home}–{f.score.away}</span>{:else}<span class="muted">v</span>{/if}
+        </td>
+        <td class="away"><a href="/teams/{f.awayTeam.slug}">{f.awayTeam.name}</a></td>
+        <td class="card">{#if f.hasCard}<a href="/matches/{f.id}">card →</a>{/if}</td>
+      </tr>
+    {/each}
+  </tbody>
+</table>
 
 {#if t.squad.length}
   <h2>Players seen this season</h2>

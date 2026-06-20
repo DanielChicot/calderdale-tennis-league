@@ -95,4 +95,29 @@ describe('parseMatchCard', () => {
     expect(threeSet).toBeDefined();
     expect(twoSet.length).toBeGreaterThanOrEqual(3);
   });
+
+  it('orients set scores onto home/away via the winning-team select (home winner)', async () => {
+    // Editable variant. Fixture 3: Queens A (home) beat Huddersfield A 8-0 in
+    // sets — the home pair won every set. A naive winner lookup (disabled input
+    // only) would invert these, showing the 8-0 winner losing 0-6.
+    const html = await loadFixture('match-card-editable.html');
+    const { rubbers } = parseMatchCard(html);
+    expect(rubbers[0]?.sets[0]).toEqual({ home: 6, away: 0 });
+    const all = rubbers.flatMap((r) => r.sets);
+    expect(all.filter((s) => s.home > s.away)).toHaveLength(8); // home won 8 sets
+    expect(all.filter((s) => s.away > s.home)).toHaveLength(0); // away won none
+  });
+
+  it('orients set scores onto home/away via the winning-team select (away winner, 3 sets)', async () => {
+    // Editable variant. Rubber 1v1: Todmorden D (home) lost to Huddersfield B
+    // (away). winner_games stays the rubber-winner's games even in the set they
+    // lost (set 2), so from the home perspective the rubber reads 4-6, 6-4, 6-10.
+    const html = await loadFixture('match-card-two-set-rubbers.html');
+    const { rubbers } = parseMatchCard(html);
+    expect(rubbers[0]?.sets).toEqual([
+      { home: 4, away: 6 },
+      { home: 6, away: 4 },
+      { home: 6, away: 10 },
+    ]);
+  });
 });

@@ -72,6 +72,32 @@ function extractPairNames(
 }
 
 /**
+ * Determine the winning team's name for a rubber, handling both markup variants:
+ *  - editable cards: a `<select id="resultsCard_winning_team_{code}">` with the
+ *    winning team as the selected option.
+ *  - locked cards: a disabled `<input type="text" value="Team Name">` in the row
+ *    immediately following the rubber's abandoned checkbox.
+ *
+ * Used to orient each set's winner_games/loser_games onto the home/away teams.
+ * Returns '' when no winner is recorded.
+ */
+function extractWinnerTeamName($: ReturnType<typeof load>, code: string): string {
+  const select = $(`select#resultsCard_winning_team_${code}`);
+  if (select.length > 0) {
+    const chosen = select.find('option[selected]').first().text().trim();
+    // Guard against the "select winning team..." placeholder being selected.
+    if (chosen && !/^select winning team/i.test(chosen)) return chosen;
+    return '';
+  }
+
+  const input = $(`#resultsCard_rubber_${code}_abandoned`)
+    .closest('tr')
+    .next('tr')
+    .find('input[type="text"][disabled]');
+  return input.attr('value')?.trim() ?? '';
+}
+
+/**
  * Parse a match-card result page (result_card_*.php) into structured rubber data.
  *
  * The page contains a 3×3 grid where rubber cells are identified by
@@ -122,10 +148,12 @@ export const parseMatchCard = (html: string): MatchCardResult => {
     const homePlayerNames = getPairNames('home', homePairIdx);
     const awayPlayerNames = getPairNames('away', awayPairIdx);
 
-    // Set scores: the winner_games and loser_games inputs encode scores in
-    // winner/loser order.  A winner input (no ID, adjacent to the abandoned
-    // checkbox) tells us which team won.  We scan for all set numbers.
+    // Set scores: the winner_games and loser_games inputs encode each set's
+    // scores in (rubber-winner, rubber-loser) order. The rubber's winning team
+    // (read once, below) tells us how to orient those onto home/away.
     const sets: { home: number; away: number }[] = [];
+
+    const winnerTeamName = extractWinnerTeamName($, code);
 
     // Find set numbers present for this rubber.
     const winnerGamesPattern = new RegExp(
@@ -147,16 +175,6 @@ export const parseMatchCard = (html: string): MatchCardResult => {
 
       const winnerGames = parseIntStrict(winnerRaw);
       const loserGames = parseIntStrict(loserRaw);
-
-      // Determine which team won by finding the winner input.
-      // It appears after the abandoned checkbox whose id is
-      // `resultsCard_rubber_{code}_abandoned`.
-      const winnerInput = $(`#resultsCard_rubber_${code}_abandoned`)
-        .closest('tr')
-        .next('tr')
-        .find('input[type="text"][disabled]');
-
-      const winnerTeamName = winnerInput.attr('value')?.trim() ?? '';
 
       let homeGames: number;
       let awayGames: number;

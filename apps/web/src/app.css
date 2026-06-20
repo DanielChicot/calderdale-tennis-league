@@ -33,8 +33,15 @@ td.figs { font-variant-numeric: tabular-nums; }
 .card { display: block; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
 .card h3 { margin: 0; font-size: 15px; }
 .muted { color: var(--muted); }
-.rubber { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; font-size: 14px; }
-.rubber .vs { color: var(--muted); font-size: 12px; margin: 2px 0; }
+.rubber {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 14px;
+}
+.rubber .side.home { text-align: right; }
+.rubber .side.away { text-align: left; }
+.rubber .result { text-align: center; white-space: nowrap; }
+.rubber .result .sets { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rubber .result .detail { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-left: 6px; }
 .score { font-weight: 700; }
 
 /* Fixtures/results grid: home right-aligned, score centred, away left-aligned. */

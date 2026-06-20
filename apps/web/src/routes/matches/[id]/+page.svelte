@@ -15,10 +15,18 @@
 <p class="muted">{formatDate(fx.date)}</p>
 
 {#each data.card.rubbers as rubber (rubber.orderInCard)}
+  {@const setsHome = rubber.sets.filter((s) => s.home > s.away).length}
+  {@const setsAway = rubber.sets.filter((s) => s.away > s.home).length}
   <div class="rubber">
-    <div>{#each rubber.homePlayers as p, i (p.slug)}{i > 0 ? ' & ' : ''}<a href="/players/{p.slug}">{p.name}</a>{/each}</div>
-    <div class="vs">vs</div>
-    <div>{#each rubber.awayPlayers as p, i (p.slug)}{i > 0 ? ' & ' : ''}<a href="/players/{p.slug}">{p.name}</a>{/each}</div>
-    <div class="score">{#each rubber.sets as s, i (i)}{i > 0 ? ', ' : ''}{s.home}-{s.away}{/each}</div>
+    <div class="side home">{#each rubber.homePlayers as p, i (p.slug)}{i > 0 ? ' & ' : ''}<a href="/players/{p.slug}">{p.name}</a>{/each}</div>
+    <div class="result">
+      {#if rubber.sets.length}
+        <span class="sets">{setsHome}–{setsAway}</span>
+        <span class="detail">({#each rubber.sets as s, i (i)}{i > 0 ? ', ' : ''}{s.home}-{s.away}{/each})</span>
+      {:else}
+        <span class="muted">—</span>
+      {/if}
+    </div>
+    <div class="side away">{#each rubber.awayPlayers as p, i (p.slug)}{i > 0 ? ' & ' : ''}<a href="/players/{p.slug}">{p.name}</a>{/each}</div>
   </div>
 {/each}

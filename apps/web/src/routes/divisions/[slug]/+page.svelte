@@ -24,8 +24,8 @@
           <td>{row.position}</td>
           <td><a href="/teams/{row.teamSlug}">{row.teamName}</a></td>
           <td class="num figs">{row.resultsReceived}/{row.resultsTotal}</td>
-          <td class="num figs">{row.pointsWon}</td>
-          <td class="num figs">{row.pointsLost}</td>
+          <td class="num figs">{formatScore(row.pointsWon, 1)}</td>
+          <td class="num figs">{formatScore(row.pointsLost, 1)}</td>
         </tr>
       {/each}
     </tbody>

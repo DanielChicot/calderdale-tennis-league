@@ -11,10 +11,14 @@ describe('formatDate', () => {
 });
 
 describe('formatScore', () => {
-  it('pads to 2 decimal places', () => {
+  it('pads to 2 decimal places by default', () => {
     expect(formatScore('509.7')).toBe('509.70');
     expect(formatScore('537.26')).toBe('537.26');
     expect(formatScore('48')).toBe('48.00');
+  });
+  it('respects a custom decimal-place count', () => {
+    expect(formatScore('62', 1)).toBe('62.0');
+    expect(formatScore('36.5', 1)).toBe('36.5');
   });
   it('returns the input unchanged when not a number', () => {
     expect(formatScore('n/a')).toBe('n/a');

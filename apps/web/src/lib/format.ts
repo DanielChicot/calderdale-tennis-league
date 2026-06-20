@@ -13,11 +13,12 @@ export const formatDate = (iso: string): string => {
 };
 
 // Format a numeric score string (drizzle returns numeric columns as strings) to a
-// fixed 2 decimal places so columns line up — e.g. "509.7" → "509.70". Returns the
-// input unchanged if it isn't a number.
-export const formatScore = (value: string): string => {
+// fixed number of decimal places so columns line up on the decimal point — e.g.
+// formatScore("509.7") → "509.70", formatScore("62", 1) → "62.0". Returns the input
+// unchanged if it isn't a number.
+export const formatScore = (value: string, dp = 2): string => {
   const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(2) : value;
+  return Number.isFinite(n) ? n.toFixed(dp) : value;
 };
 
 // Group divisions by their group label, preserving Mens → Ladies → Mixed order.

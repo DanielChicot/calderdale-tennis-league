@@ -13,8 +13,8 @@ describe('getTeam', () => {
     );
   });
 
-  it('returns null for unknown slug', async () => {
-    expect(await getTeam(getDb(), 'nope')).toBeNull();
+  it('returns null for unknown (division, slug)', async () => {
+    expect(await getTeam(getDb(), 'mens-division-1', 'nope')).toBeNull();
   });
 
   it('returns team meta, contacts, fixtures, and best-effort squad', async () => {
@@ -46,7 +46,7 @@ describe('getTeam', () => {
       matchCardId: card!.id, orderInCard: 1, homePlayerIds: [p1!.id, p2!.id], awayPlayerIds: [],
     });
 
-    const result = await getTeam(db, 'cragg-vale-a');
+    const result = await getTeam(db, 'mens-1', 'cragg-vale-a');
     expect(result).not.toBeNull();
     expect(result!.slug).toBe('cragg-vale-a');
     expect(result!.club).toEqual({ slug: 'cragg-vale', name: 'Cragg Vale' });
@@ -55,7 +55,30 @@ describe('getTeam', () => {
       { name: 'Captain Cathy', role: 'Captain', phone: '01234', email: null },
     ]);
     expect(result!.fixtures).toHaveLength(1);
+    expect(result!.fixtures[0]?.divisionSlug).toBe('mens-1');
     expect(result!.fixtures[0]?.score).toEqual({ home: '6', away: '3' });
     expect(result!.squad.map((p) => p.slug).sort()).toEqual(['p1', 'p2']);
+  });
+
+  it('disambiguates same-slug teams in different divisions by division slug', async () => {
+    // Regression: a club's "A" team appears in several competitions with the
+    // same slug (e.g. queens-a in Ladies + Mixed). getTeam must return the team
+    // belonging to the requested division, not an arbitrary slug match.
+    const db = getDb();
+    const [season] = await db.insert(schema.seasons).values({ slug: 's', name: 'S', current: true }).returning();
+    const [ladies, mixed] = await db.insert(schema.divisions).values([
+      { slug: 'ladies-division-1', name: 'Ladies Division 1', group: 'Ladies', seasonId: season!.id, upstreamModeId: 3 },
+      { slug: 'mixed-division-1', name: 'Mixed Division 1', group: 'Mixed', seasonId: season!.id, upstreamModeId: 1 },
+    ]).returning();
+    const [club] = await db.insert(schema.clubs).values({ slug: 'queens', canonicalName: 'Queens' }).returning();
+    await db.insert(schema.teams).values([
+      { slug: 'queens-a', name: 'Queens A', clubId: club!.id, divisionId: ladies!.id },
+      { slug: 'queens-a', name: 'Queens A', clubId: club!.id, divisionId: mixed!.id },
+    ]);
+
+    const fromLadies = await getTeam(db, 'ladies-division-1', 'queens-a');
+    const fromMixed = await getTeam(db, 'mixed-division-1', 'queens-a');
+    expect(fromLadies!.division).toEqual({ slug: 'ladies-division-1', name: 'Ladies Division 1' });
+    expect(fromMixed!.division).toEqual({ slug: 'mixed-division-1', name: 'Mixed Division 1' });
   });
 });

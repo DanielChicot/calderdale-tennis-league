@@ -8,9 +8,9 @@
   <a href="/">Home</a> › <a href="/divisions/{fx.division.slug}">{fx.division.name}</a> › Match
 </nav>
 <h1>
-  <a href="/teams/{fx.homeTeam.slug}">{fx.homeTeam.name}</a>
+  <a href="/teams/{fx.division.slug}/{fx.homeTeam.slug}">{fx.homeTeam.name}</a>
   {#if fx.score}<span class="score">{fx.score.home}–{fx.score.away}</span>{:else}v{/if}
-  <a href="/teams/{fx.awayTeam.slug}">{fx.awayTeam.name}</a>
+  <a href="/teams/{fx.division.slug}/{fx.awayTeam.slug}">{fx.awayTeam.name}</a>
 </h1>
 <p class="muted">{formatDate(fx.date)}</p>
 

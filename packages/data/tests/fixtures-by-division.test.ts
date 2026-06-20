@@ -53,6 +53,7 @@ describe('listFixturesByDivision', () => {
     expect(rows[0]).toEqual({
       id: played!.id,
       date: '2026-04-23',
+      divisionSlug: 'mens-1',
       homeTeam: { slug: 'home-a', name: 'Home A' },
       awayTeam: { slug: 'away-a', name: 'Away A' },
       status: 'completed',

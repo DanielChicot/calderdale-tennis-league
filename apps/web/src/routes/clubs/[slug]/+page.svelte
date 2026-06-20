@@ -16,8 +16,8 @@
 
 <h2>Teams</h2>
 <div class="cards">
-  {#each c.teams as team (team.slug)}
-    <a class="card" href="/teams/{team.slug}">
+  {#each c.teams as team (team.division.slug + '/' + team.slug)}
+    <a class="card" href="/teams/{team.division.slug}/{team.slug}">
       <h3>{team.name}</h3>
       <span class="muted">{team.division.name}</span>
     </a>

@@ -1,4 +1,4 @@
-import { aliasedTable, eq, inArray, or, sql } from 'drizzle-orm';
+import { aliasedTable, and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Database } from '@ctl/db';
 import { schema } from '@ctl/db';
 import type { FixtureRow } from './fixtures.js';
@@ -21,7 +21,14 @@ export type TeamDetail = {
   squad: PlayerRef[];
 };
 
-export const getTeam = async (db: Database, slug: string): Promise<TeamDetail | null> => {
+// Team slugs are only unique within a division (a club's "A" team can appear in
+// the Mens, Ladies and Mixed competitions), so a team is addressed by the pair
+// (divisionSlug, slug) — never by slug alone.
+export const getTeam = async (
+  db: Database,
+  divisionSlug: string,
+  slug: string,
+): Promise<TeamDetail | null> => {
   const [team] = await db
     .select({
       id: schema.teams.id,
@@ -35,7 +42,7 @@ export const getTeam = async (db: Database, slug: string): Promise<TeamDetail | 
     .from(schema.teams)
     .innerJoin(schema.clubs, eq(schema.clubs.id, schema.teams.clubId))
     .innerJoin(schema.divisions, eq(schema.divisions.id, schema.teams.divisionId))
-    .where(eq(schema.teams.slug, slug))
+    .where(and(eq(schema.teams.slug, slug), eq(schema.divisions.slug, divisionSlug)))
     .limit(1);
   if (!team) return null;
 
@@ -57,6 +64,7 @@ export const getTeam = async (db: Database, slug: string): Promise<TeamDetail | 
       id: schema.fixtures.id,
       date: schema.fixtures.date,
       status: schema.fixtures.status,
+      divSlug: schema.divisions.slug,
       homeSlug: home.slug, homeName: home.name,
       awaySlug: away.slug, awayName: away.name,
       homeScore: schema.results.homeScore,
@@ -64,6 +72,7 @@ export const getTeam = async (db: Database, slug: string): Promise<TeamDetail | 
       cardId: schema.matchCards.id,
     })
     .from(schema.fixtures)
+    .innerJoin(schema.divisions, eq(schema.divisions.id, schema.fixtures.divisionId))
     .innerJoin(home, eq(home.id, schema.fixtures.homeTeamId))
     .innerJoin(away, eq(away.id, schema.fixtures.awayTeamId))
     .leftJoin(schema.results, eq(schema.results.fixtureId, schema.fixtures.id))
@@ -73,6 +82,7 @@ export const getTeam = async (db: Database, slug: string): Promise<TeamDetail | 
   const fixtures: FixtureRow[] = fxRows.map((r) => ({
     id: r.id,
     date: r.date,
+    divisionSlug: r.divSlug,
     homeTeam: { slug: r.homeSlug, name: r.homeName },
     awayTeam: { slug: r.awaySlug, name: r.awayName },
     status: r.status,

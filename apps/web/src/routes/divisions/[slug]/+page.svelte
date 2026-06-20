@@ -22,7 +22,7 @@
       {#each data.table.rows as row (row.teamId)}
         <tr>
           <td>{row.position}</td>
-          <td><a href="/teams/{row.teamSlug}">{row.teamName}</a></td>
+          <td><a href="/teams/{data.table.division.slug}/{row.teamSlug}">{row.teamName}</a></td>
           <td class="num figs">{row.resultsReceived}/{row.resultsTotal}</td>
           <td class="num figs">{formatScore(row.pointsWon, 1)}</td>
           <td class="num figs">{formatScore(row.pointsLost, 1)}</td>
@@ -36,11 +36,11 @@
       {#each data.fixtures as f (f.id)}
         <tr>
           <td class="muted date">{formatDate(f.date)}</td>
-          <td class="home"><a href="/teams/{f.homeTeam.slug}">{f.homeTeam.name}</a></td>
+          <td class="home"><a href="/teams/{f.divisionSlug}/{f.homeTeam.slug}">{f.homeTeam.name}</a></td>
           <td class="result">
             {#if f.score}<span class="score">{f.score.home}–{f.score.away}</span>{:else}<span class="muted">v</span>{/if}
           </td>
-          <td class="away"><a href="/teams/{f.awayTeam.slug}">{f.awayTeam.name}</a></td>
+          <td class="away"><a href="/teams/{f.divisionSlug}/{f.awayTeam.slug}">{f.awayTeam.name}</a></td>
           <td class="card">{#if f.hasCard}<a href="/matches/{f.id}">card →</a>{/if}</td>
         </tr>
       {/each}

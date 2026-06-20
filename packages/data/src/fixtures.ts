@@ -19,6 +19,10 @@ export const getFixture = async (db: Database, id: number): Promise<FixtureSumma
 export type FixtureRow = {
   id: number;
   date: string;
+  // Division of this fixture — both teams play in it. Used to build the
+  // division-scoped team URL (/teams/<division>/<team>) since team slugs are
+  // only unique within a division.
+  divisionSlug: string;
   homeTeam: { slug: string; name: string };
   awayTeam: { slug: string; name: string };
   status: string;
@@ -27,12 +31,13 @@ export type FixtureRow = {
 };
 
 const mapFixtureRow = (r: {
-  id: number; date: string; status: string;
+  id: number; date: string; status: string; divSlug: string;
   homeSlug: string; homeName: string; awaySlug: string; awayName: string;
   homeScore: string | null; awayScore: string | null; cardId: number | null;
 }): FixtureRow => ({
   id: r.id,
   date: r.date,
+  divisionSlug: r.divSlug,
   homeTeam: { slug: r.homeSlug, name: r.homeName },
   awayTeam: { slug: r.awaySlug, name: r.awayName },
   status: r.status,
@@ -48,6 +53,7 @@ export const listFixturesByDivision = async (db: Database, divisionId: number): 
       id: schema.fixtures.id,
       date: schema.fixtures.date,
       status: schema.fixtures.status,
+      divSlug: schema.divisions.slug,
       homeSlug: home.slug, homeName: home.name,
       awaySlug: away.slug, awayName: away.name,
       homeScore: schema.results.homeScore,
@@ -55,6 +61,7 @@ export const listFixturesByDivision = async (db: Database, divisionId: number): 
       cardId: schema.matchCards.id,
     })
     .from(schema.fixtures)
+    .innerJoin(schema.divisions, eq(schema.divisions.id, schema.fixtures.divisionId))
     .innerJoin(home, eq(home.id, schema.fixtures.homeTeamId))
     .innerJoin(away, eq(away.id, schema.fixtures.awayTeamId))
     .leftJoin(schema.results, eq(schema.results.fixtureId, schema.fixtures.id))

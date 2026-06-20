@@ -48,4 +48,4 @@ table.fixtures td.result .score {
   display: inline-block; min-width: 56px; padding: 2px 8px; border-radius: 6px;
   background: var(--green-light); color: var(--green); font-variant-numeric: tabular-nums;
 }
-table.fixtures td.card { text-align: right; white-space: nowrap; width: 1%; font-size: 13px; }
+table.fixtures td.cardlink { text-align: right; white-space: nowrap; width: 1%; font-size: 13px; }

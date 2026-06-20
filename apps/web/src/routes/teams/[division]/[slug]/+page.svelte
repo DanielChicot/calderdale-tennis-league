@@ -31,7 +31,7 @@
           {#if f.score}<span class="score">{f.score.home}–{f.score.away}</span>{:else}<span class="muted">v</span>{/if}
         </td>
         <td class="away"><a href="/teams/{f.divisionSlug}/{f.awayTeam.slug}">{f.awayTeam.name}</a></td>
-        <td class="card">{#if f.hasCard}<a href="/matches/{f.id}">card →</a>{/if}</td>
+        <td class="cardlink">{#if f.hasCard}<a href="/matches/{f.id}">card →</a>{/if}</td>
       </tr>
     {/each}
   </tbody>

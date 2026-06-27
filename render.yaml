@@ -1,0 +1,80 @@
+# render.yaml — Render Blueprint for the Calderdale Tennis League viewer.
+#
+# Provisions an independent stack, fully isolated from the SAN/ofelia deployment
+# in infra/. Three resources, one Render Postgres of its own:
+#
+#   1. ctl-db       — managed Render Postgres (this deployment's own database)
+#   2. ctl-web      — SvelteKit (adapter-node) web service
+#   3. ctl-scraper  — cron job that refreshes ctl-db twice weekly
+#
+# Apply via: Render Dashboard → Blueprints → New Blueprint Instance → point at this repo.
+# pnpm is picked up automatically from the repo's "packageManager" field via corepack.
+
+databases:
+  - name: ctl-db
+    # Pick a paid plan for anything permanent — Render's free Postgres is deleted
+    # after ~30 days. basic-256mb is plenty for this dataset.
+    plan: basic-256mb
+    region: frankfurt # closest Render region to the UK
+    postgresMajorVersion: "16" # matches the dev/SAN Postgres (postgres:16)
+    databaseName: ctl
+    user: ctl
+
+services:
+  # --- Web viewer -----------------------------------------------------------
+  - name: ctl-web
+    type: web
+    runtime: node
+    region: frankfurt
+    plan: starter # 'free' cold-starts/sleeps after inactivity
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @ctl/web build
+    # Apply DB migrations once per deploy, after build, before the new version goes live.
+    # `pnpm --filter` runs with CWD = packages/db so the migrator's relative
+    # migrationsFolder ('./src/migrations') resolves correctly.
+    preDeployCommand: pnpm --filter @ctl/db db:migrate
+    startCommand: node apps/web/build/index.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22" # repo requires Node >=22
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ctl-db
+          property: connectionString # internal URL — no ?sslmode needed inside Render
+
+  # --- Scraper (scheduled) --------------------------------------------------
+  - name: ctl-scraper
+    type: cron
+    runtime: node
+    region: frankfurt
+    plan: starter
+    # Render cron schedules are in UTC. 09:00 UTC ≈ 10:00 UK during BST (the summer
+    # season), matching the SAN's "Thu & Sun 10:00 London". Outside BST this is 09:00 UK.
+    schedule: "0 9 * * 4,0"
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    # migrate (idempotent) then scrape the current season — mirrors infra/scraper.Dockerfile.
+    startCommand: pnpm --filter @ctl/db db:migrate && pnpm --filter @ctl/scraper exec tsx src/index.ts
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ctl-db
+          property: connectionString
+#
+# ── Ad-hoc / on-demand scrapes ───────────────────────────────────────────────
+# The cron only ever runs the scheduled command (current season). For one-off
+# runs with different arguments (backfill, a specific season), trigger a Render
+# one-off job against ctl-scraper — it reuses that service's latest build + env
+# (including DATABASE_URL). Easiest is infra/render-adhoc-scrape.sh, which wraps:
+#
+#   render jobs create <srv-...> \
+#     --start-command "pnpm --filter @ctl/scraper exec tsx src/index.ts --backfill"
+#
+# Or without the CLI, the equivalent REST call:
+#
+#   curl -X POST https://api.render.com/v1/services/<srv-...>/jobs \
+#     -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" \
+#     -d '{"startCommand":"pnpm --filter @ctl/scraper exec tsx src/index.ts --backfill"}'
+#
+# To re-run the *scheduled* command now (current season), just hit "Trigger Run"
+# on the ctl-scraper cron job in the Render dashboard.

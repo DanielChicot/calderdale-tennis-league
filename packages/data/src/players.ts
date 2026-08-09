@@ -1,4 +1,4 @@
-import { arrayContains, eq, inArray, or } from 'drizzle-orm';
+import { arrayContains, eq, ilike, inArray, or } from 'drizzle-orm';
 import type { Database } from '@ctl/db';
 import type { PlayerRef } from './match-cards.js';
 import { schema } from '@ctl/db';
@@ -157,4 +157,24 @@ export const getPlayerProfile = async (db: Database, slug: string): Promise<Play
     rankings,
     matchHistory,
   };
+};
+
+export type PlayerSearchRow = { slug: string; name: string; club: { slug: string; name: string } };
+
+// Case-insensitive substring search over player names, for the /players
+// "find your name" page. Capped at 25 rows — plenty for disambiguation.
+export const searchPlayers = async (db: Database, query: string): Promise<PlayerSearchRow[]> => {
+  const rows = await db
+    .select({
+      slug: schema.players.slug,
+      name: schema.players.name,
+      clubSlug: schema.clubs.slug,
+      clubName: schema.clubs.canonicalName,
+    })
+    .from(schema.players)
+    .innerJoin(schema.clubs, eq(schema.clubs.id, schema.players.clubId))
+    .where(ilike(schema.players.name, `%${query.trim()}%`))
+    .orderBy(schema.players.name)
+    .limit(25);
+  return rows.map((r) => ({ slug: r.slug, name: r.name, club: { slug: r.clubSlug, name: r.clubName } }));
 };

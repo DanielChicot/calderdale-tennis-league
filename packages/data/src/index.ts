@@ -6,3 +6,4 @@ export * from './players.js';
 export * from './rankings.js';
 export * from './match-cards.js';
 export * from './teams.js';
+export * from './player-panel.js';

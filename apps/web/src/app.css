@@ -341,3 +341,18 @@ table.fixtures td.result .score {
 }
 table.fixtures td.cardlink { text-align: right; white-space: nowrap; width: 1%; font-size: 12px; }
 table.fixtures td.cardlink a { font-family: var(--mono); }
+
+/* ---- /players name search ------------------------------------------------ */
+.searchbox { display: flex; gap: 8px; margin: 16px 0 8px; }
+.searchbox input {
+  flex: 1; font: inherit; color: var(--text);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 999px;
+  padding: 10px 18px; outline: none;
+}
+.searchbox input:focus { border-color: var(--accent); }
+.searchbox button {
+  font: inherit; font-weight: 700; font-size: 13px; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink);
+  border: none; border-radius: 999px; padding: 10px 22px;
+}
+.card p.muted { margin: 4px 0 0; font-size: 13px; }
